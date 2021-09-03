@@ -1,0 +1,1 @@
+This is the design drafts of `nari2d`, from the basic functionality to the file format.
