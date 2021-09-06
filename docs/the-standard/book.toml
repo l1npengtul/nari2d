@@ -1,0 +1,6 @@
+[book]
+authors = ["l1npengtul"]
+language = "en"
+multilingual = false
+src = "src"
+title = "The Nari2D Standard"

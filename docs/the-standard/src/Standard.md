@@ -60,10 +60,27 @@ Users should be able to define or override systems provided by Nari by implement
 #### Rendering
 The renderer will be provided as a system, and we will provide many backends 
 such as Godot or Bevy or WGPU through the use of backend abstraction crates. We will also
-have a bare abstraction crate that will provide a IMGUI-style renderer allowing plugging
+have a bare abstraction crate that will provide an intermediate style renderer allowing plugging
 in of Nari2D into any place.
 
 ### File Format
 
-#### Extension
-The extension for a Nari2D file will be `.n2d`. 
+#### File Extensions
+
+- Outputs:
+  - `.n2d`: A compiled Nari2D file.
+  - `.n2db`: A compiled Nari2D in binary format (embedded data)
+- Project Configuration
+  - `.n2d-manifest`: A Nari2D Manifest file containing author data for e.g. an editor
+  - `.n2ds`: Nari2D Script file
+- Plugins
+  - `n2dp`: Nari2D Plugin File
+
+#### Internal Format
+The configuration of a Nari2D file will be made in XML. For images, the TIFF should be used
+to provide cross-application layered information, with the final data being exported to either a 
+PNG or embedded directly in the output file.
+
+#### XML Format
+See 
+
