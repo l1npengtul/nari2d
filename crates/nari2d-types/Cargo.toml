@@ -1,0 +1,13 @@
+[package]
+name = "nari2d-types"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+thiserror = "1.0.29"
+bevy_ecs = "0.5.0"
+smallvec = "1.6.1"
+petgraph = "0.6.0"
+euclid = "0.22.6"
