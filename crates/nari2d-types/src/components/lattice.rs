@@ -1,4 +1,5 @@
 use crate::components::PositionComponent;
+use crate::components::position::PositionComponent;
 
 // The Vec is flattened width-wise, i.e. Vec< [row 1; width] * height times >
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]

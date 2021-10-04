@@ -1,5 +1,10 @@
-use crate::components::{PositionComponent, RotationComponent};
 use smallvec::SmallVec;
+use crate::{
+    components::{
+        position::PositionComponent,
+        rotation::RotationComponent
+    }
+};
 
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct Bone {

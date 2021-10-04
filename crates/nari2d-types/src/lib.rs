@@ -4,3 +4,5 @@
 mod components;
 mod error;
 mod resources;
+mod traits;
+mod resource_path;
