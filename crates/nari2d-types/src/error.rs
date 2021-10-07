@@ -5,6 +5,7 @@ use thiserror::Error;
 pub enum Nari2DError {
     InvalidIDError(u64),
     InvalidTypeError(ResourceType),
+    InvalidPath(String),
 }
 
 pub enum Nari2DResultCode {}
