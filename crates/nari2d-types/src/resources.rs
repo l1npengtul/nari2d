@@ -2,13 +2,14 @@ use crate::error::Nari2DError;
 use dashmap::DashMap;
 use parking_lot::RwLock;
 use smallvec::SmallVec;
-use std::borrow::Cow;
-use std::convert::TryFrom;
-use std::ffi::OsString;
-use std::ops::{Deref, DerefMut};
-use std::path::PathBuf;
-use std::sync::atomic::AtomicUsize;
-use std::sync::Arc;
+use std::{
+    borrow::Cow,
+    convert::TryFrom,
+    ffi::OsString,
+    ops::{Deref, DerefMut},
+    path::PathBuf,
+    sync::{atomic::AtomicUsize, Arc},
+};
 
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub enum ResourceType {
@@ -23,20 +24,6 @@ pub enum ResourceType {
 pub struct ResourceID(u32);
 
 impl ResourceID {}
-
-impl Deref for ResourceID {
-    type Target = u32;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for ResourceID {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
 
 impl From<ResourceID> for u32 {
     fn from(id: ResourceID) -> Self {
