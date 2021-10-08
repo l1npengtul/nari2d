@@ -1,5 +1,6 @@
 use crate::error::Nari2DError;
 use dashmap::DashMap;
+use gltf::Scene;
 use parking_lot::RwLock;
 use smallvec::SmallVec;
 use std::{
@@ -12,12 +13,23 @@ use std::{
 };
 
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub enum ResourceType {
+pub enum ResourceFileType {
     ImagePNG,
     ImageTIFF,
     ImageJPEG,
     ImageBMP,
     MeshGLTF,
+}
+
+pub enum ResourceRawHold<'a> {
+    ImageRGBA {
+        width: u32,
+        height: u32,
+        data: Cow<'a, [u8]>,
+    },
+    MeshGLTF {
+        scene: Scene<'a>,
+    },
 }
 
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
@@ -32,38 +44,12 @@ impl From<ResourceID> for u32 {
 }
 
 #[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub enum ResourcePath {
-    Local { data: SmallVec<[String; 8]> },
-    External { path: PathBuf },
-}
-
-impl ResourcePath {
-    pub fn new(path: String) -> Self {
-        let mut path = path;
-        if path.starts_with("n2dfile://") {
-            path.replace("n2dfile://", "");
-            let mut directories = vec![];
-            for dir in path.split("/") {
-                directories.push(dir.to_string());
-            }
-            ResourcePath::Local {
-                data: SmallVec::from_vec(directories),
-            }
-        } else {
-            ResourcePath::External {
-                path: PathBuf::from(path),
-            }
-        }
-    }
-}
-
-#[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct ResourceData<'a> {
     reference_count: AtomicUsize,
-    resource_type: ResourceType,
+    resource_type: ResourceFileType,
     resource_id: u32,
     data: Arc<RwLock<Cow<'a, [u8]>>>,
-    source: ResourcePath,
+    source: SmallVec<[String; 8]>,
 }
 
 impl<'a> ResourceData<'a> {}
