@@ -1,6 +1,7 @@
-use euclid::{Rotation2D, UnknownUnit, Angle};
+use euclid::{Angle, Rotation2D, UnknownUnit};
+use std::ops::{Deref, DerefMut};
 
-#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Copy, Clone, PartialEq)]
 pub struct RotationComponent {
     rotation: Rotation2D<f32, UnknownUnit, UnknownUnit>,
 }

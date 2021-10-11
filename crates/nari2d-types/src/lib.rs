@@ -1,8 +1,8 @@
 #![deny(clippy::pedantic)]
 #![warn(clippy::all)]
+#![allow(clippy::module_name_repetitions)]
 
-mod components;
-mod error;
-mod resources;
-mod traits;
-mod resource_path;
+pub mod asset;
+pub mod components;
+pub mod error;
+pub mod traits;

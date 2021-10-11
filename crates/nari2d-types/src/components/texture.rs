@@ -1,7 +1,7 @@
-use std::borrow::Cow;
-use gltf::Scene;
 use crate::components::scale::ScaleComponent;
-use euclid::{Point3D, UnknownUnit, Rotation3D};
+use euclid::{Point3D, Rotation3D, UnknownUnit};
+use gltf::Scene;
+use std::borrow::Cow;
 
 // // Always assumes RGBA
 // pub struct TextureComponent {
@@ -51,10 +51,10 @@ pub enum TextureType {
         scale_mode: EmbedScaleMode,
         model: Scene<'static>,
         mdl_path: String,
-   },
+    },
 }
 
-#[derive(Copy, Clone, Debug, Hash, PartialOrd, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
 pub struct Modulation(f32, f32, f32, f32);
 
 #[derive(Clone, Debug)]
@@ -62,9 +62,9 @@ pub struct TextureComponent {
     height: u32,
     width: u32,
     texture_type: TextureType,
-    scale : ScaleComponent,
+    scale: ScaleComponent,
     transparency: f32,
     modulate: Modulation,
     self_modulate: Modulation,
-    image_data: Cow<'static, [u8]>
+    image_data: Cow<'static, [u8]>,
 }

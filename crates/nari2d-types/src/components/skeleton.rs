@@ -1,12 +1,7 @@
+use crate::components::{position::PositionComponent, rotation::RotationComponent};
 use smallvec::SmallVec;
-use crate::{
-    components::{
-        position::PositionComponent,
-        rotation::RotationComponent
-    }
-};
 
-#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Copy, Clone, PartialEq)]
 pub struct Bone {
     start_position: PositionComponent,
     rotation: RotationComponent,
@@ -27,7 +22,7 @@ impl Default for Bone {
     }
 }
 
-#[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct SkeletonComponent {
     bones: SmallVec<[Bone; 8]>,
 }

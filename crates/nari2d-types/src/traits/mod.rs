@@ -1,2 +1,2 @@
+pub mod asset_service;
 pub mod render;
-pub mod resource_service;

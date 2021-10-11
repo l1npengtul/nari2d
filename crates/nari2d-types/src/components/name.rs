@@ -1,17 +1,17 @@
 use std::{
-    borrow::{Cow, Borrow},
+    borrow::{Borrow, Cow},
+    fmt::{Display, Formatter},
     ops::{Deref, DerefMut},
-    fmt::{Display, Formatter}
 };
 
-#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct NameComponent {
-    name: Cow<'static, str>,
+    name: String,
 }
 
 impl NameComponent {
-    pub fn new<S: AsRef<str>>(name: S) -> Self {
-        let name = Cow::from(name.as_ref());
+    pub fn new<S: ToString>(name: S) -> Self {
+        let name = name.to_string();
         NameComponent { name }
     }
 
@@ -19,22 +19,12 @@ impl NameComponent {
         self.name.borrow()
     }
 
-    pub fn set_name<S: AsRef<str>>(&mut self, new_name: S) {
-        self.name = Cow::from(new_name.as_ref());
+    pub fn name_owned(&self) -> String {
+        self.name.clone()
     }
-}
 
-impl Deref for NameComponent {
-    type Target = &'static str;
-
-    fn deref(&self) -> &Self::Target {
-        self.name.borrow()
-    }
-}
-
-impl DerefMut for NameComponent {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.name.borrow()
+    pub fn set_name<S: ToString>(&mut self, new_name: S) {
+        self.name = new_name.to_string()
     }
 }
 

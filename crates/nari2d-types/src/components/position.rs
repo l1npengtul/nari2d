@@ -1,40 +1,47 @@
 use euclid::Point2D;
 use std::ops::{Deref, DerefMut};
 
-#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct PositionComponent {
     position: Point2D<f32, f32>,
 }
 
 impl PositionComponent {
+    #[must_use]
     pub fn new(x: f32, y: f32) -> Self {
         PositionComponent {
             position: Point2D::new(x, y),
         }
     }
 
+    #[must_use]
     pub fn from_tuple(pos: (f32, f32)) -> Self {
         PositionComponent {
             position: Point2D::new(pos.0, pos.1),
         }
     }
 
+    #[must_use]
     pub fn from_array(pos: [f32; 2]) -> Self {
         PositionComponent::from_tuple((pos[0], pos[1]))
     }
 
+    #[must_use]
     pub fn position_x(&self) -> f32 {
         self.position.x
     }
 
+    #[must_use]
     pub fn position_y(&self) -> f32 {
         self.position.y
     }
 
+    #[must_use]
     pub fn to_tuple(&self) -> (f32, f32) {
         (self.position_x(), self.position_y())
     }
 
+    #[must_use]
     pub fn to_array(&self) -> [f32; 2] {
         [self.position_x(), self.position_y()]
     }
