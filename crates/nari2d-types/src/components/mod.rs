@@ -1,7 +1,7 @@
 pub mod lattice;
 pub mod light;
 pub mod mesh;
-pub mod nodeinfo;
+pub mod node_info;
 pub mod particle_emitter;
 pub mod physics;
 pub mod position;
