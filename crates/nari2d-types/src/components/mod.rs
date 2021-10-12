@@ -1,7 +1,7 @@
 pub mod lattice;
 pub mod light;
 pub mod mesh;
-pub mod name;
+pub mod nodeinfo;
 pub mod particle_emitter;
 pub mod physics;
 pub mod position;
@@ -9,4 +9,3 @@ pub mod rotation;
 pub mod scale;
 pub mod skeleton;
 pub mod texture;
-pub mod visibility;
