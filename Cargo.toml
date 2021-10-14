@@ -12,8 +12,12 @@ bevy_ecs = "0.5.0"
 smallvec = "1.6.1"
 petgraph = "0.6.0"
 parking_lot = "0.11.2"
+euclid = "0.22.6"
 ahash = "0.7.5"
 
 [dependencies.image]
 version = "0.23.14"
 default-features = false
+
+[dependencies.nari2d_core]
+path = "crates/nari2d_core"

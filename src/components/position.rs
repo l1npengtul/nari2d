@@ -78,3 +78,9 @@ impl From<[f32; 2]> for PositionComponent {
         PositionComponent::from_array(pos)
     }
 }
+
+impl From<Point2D<f32, f32>> for PositionComponent {
+    fn from(point: Point2D<f32, f32>) -> Self {
+        PositionComponent::from(point.to_array())
+    }
+}

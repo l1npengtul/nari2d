@@ -50,3 +50,9 @@ impl Default for RotationComponent {
         }
     }
 }
+
+impl From<Rotation2D<f32, UnknownUnit, UnknownUnit>> for RotationComponent {
+    fn from(rotation: Rotation2D<f32, UnknownUnit, UnknownUnit>) -> Self {
+        RotationComponent::new(rotation.angle.to_radians())
+    }
+}

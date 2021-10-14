@@ -1,0 +1,21 @@
+[package]
+name = "nari2d-anita"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = ["scalar", "simd-arm-neon", "simd-wasm", "simd-x86-avx2", "simd-x86-sse42"]
+scalar = []
+simd-arm-neon = []
+simd-wasm = []
+simd-wgpu = ["wgpu"]
+simd-x86-sse42 = []
+simd-x86-avx2 = []
+
+[dependencies]
+
+[dependencies.wgpu]
+version = "0.11.0"
+optional = true

@@ -5,5 +5,3 @@
 pub mod asset;
 pub mod components;
 pub mod context;
-pub mod error;
-pub mod traits;
