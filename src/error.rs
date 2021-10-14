@@ -5,8 +5,8 @@ use thiserror::Error;
 pub enum Nari2DError {
     #[error("Invalid Resource Operation {resource_id} of type {resource_type}: {error}")]
     InvalidAssetOperation {
-        resource_id: AssetID,
-        resource_type: AssetType,
+        asset_id: AssetID,
+        asset_type: AssetType,
         error: String,
     },
     #[error("No Resource {id}")]

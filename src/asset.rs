@@ -1,4 +1,5 @@
 use crate::{error::Nari2DError, traits::asset_service::AssetProvider};
+use ahash::{AHasher, RandomState};
 use dashmap::DashMap;
 use gltf::Document;
 use image::{ImageBuffer, Rgba};
@@ -13,7 +14,6 @@ use std::{
 pub enum AssetType {
     None,
     Image,
-    MeshGLTF,
 }
 
 impl Display for AssetType {
@@ -28,9 +28,6 @@ pub enum AssetRawHold {
         width: u32,
         height: u32,
         data: ImageBuffer<Rgba<u8>, Vec<u8>>,
-    },
-    MeshGLTF {
-        scene: Box<Document>,
     },
     None,
 }
@@ -113,7 +110,7 @@ impl AssetData {
 #[derive(Clone, Debug)]
 pub struct NariAssetStore {
     asset_index: Cell<u32>,
-    data_store: DashMap<AssetID, AssetData>,
+    data_store: DashMap<AssetID, AssetData, RandomState>,
 }
 
 impl NariAssetStore {
@@ -137,7 +134,7 @@ impl Default for NariAssetStore {
     fn default() -> Self {
         NariAssetStore {
             asset_index: Cell::new(0),
-            data_store: DashMap::new(),
+            data_store: DashMap::with_hasher(RandomState::new()),
         }
     }
 }
