@@ -1,70 +1,33 @@
-use crate::components::scale::ScaleComponent;
-use euclid::{Point3D, Rotation3D, UnknownUnit};
-use gltf::Scene;
+use crate::{asset::AssetID, components::position::PositionComponent};
+use petgraph::Graph;
 use std::borrow::Cow;
 
-// // Always assumes RGBA
-// pub struct TextureComponent {
-//     height_x: u32,
-//     width_y: u32,
-//     scale: ScaleComponent,
-//     // traaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaans
-//     transparency: f32,
-//     data: Cow<'static, [u8]>,
-// }
-//
-// impl TextureComponent {}
-//
-// pub enum WindowMode {
-//     Crop,
-//     Scale,
-// }
-//
-// // A image using a window into a 3d world
-// pub struct RenderedTextureComponent {
-//     height_x: u32,
-//     width_y: u32,
-//     source_x: u32,
-//     source_y: u32,
-//     mode: WindowMode,
-//     scale: ScaleComponent,
-//     image_data: Cow<'static, [u8]>,
-//     render_model: Scene<'static>
-// }
-//
-// impl RenderedTextureComponent {
-//
-// }
-
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub enum EmbedScaleMode {
-    Crop,
-    Scale,
-}
+pub struct Modulation(u8, u8, u8, u8);
 
-#[derive(Clone, Debug)]
-pub enum TextureType {
-    Image,
-    Embedded3D {
-        source_height: u32,
-        source_width: u32,
-        scale_mode: EmbedScaleMode,
-        model: Scene<'static>,
-        mdl_path: String,
-    },
-}
+// oh god how the fuck will i do this AHHHHH
+// i need to somehow make a dynamic mesh that deforms an image
 
-#[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
-pub struct Modulation(f32, f32, f32, f32);
+// http://www.geosensor.net/papers/duckham08.PR.pdf
+// https://en.wikipedia.org/wiki/Delaunay_triangulation
+// https://www.cs.cmu.edu/~quake/tripaper/triangle2.html
+// https://www.newcastle.edu.au/__data/assets/pdf_file/0017/22508/13_A-fast-algorithm-for-constructing-Delaunay-triangulations-in-the-plane.pdf
+// [pain]
+
+#[derive(Clone, Debug, Default)]
+pub struct Mesh {
+    points: Graph<PositionComponent, ()>,
+}
 
 #[derive(Clone, Debug)]
 pub struct TextureComponent {
     height: u32,
     width: u32,
-    texture_type: TextureType,
-    scale: ScaleComponent,
     transparency: f32,
     modulate: Modulation,
     self_modulate: Modulation,
+    data_id: AssetID,
     image_data: Cow<'static, [u8]>,
+    base_mesh: Mesh,
+    transform_mesh: Mesh,
 }
