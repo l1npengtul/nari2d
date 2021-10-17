@@ -1,3 +1,1 @@
-pub trait RendererTrait {
-
-}
+pub trait RendererTrait {}
