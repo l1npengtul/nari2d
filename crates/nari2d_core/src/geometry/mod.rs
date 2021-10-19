@@ -1,10 +1,11 @@
-mod angle;
-mod point2d;
-mod scale2d;
-
 pub use angle::Angle;
 pub use point2d::Point2d;
 pub use scale2d::Scale2d;
+
+mod angle;
+pub mod mesh;
+mod point2d;
+mod scale2d;
 
 /// ```.ignore
 ///       C

@@ -6,13 +6,12 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["scalar", "simd-arm-neon", "simd-wasm", "simd-x86-avx2", "simd-x86-sse42"]
+default = ["scalar", "simd-arm-neon", "simd-wasm", "simd-x86"]
 scalar = []
 simd-arm-neon = []
 simd-wasm = []
 simd-wgpu = ["wgpu"]
-simd-x86-sse42 = []
-simd-x86-avx2 = []
+simd-x86 = []
 
 [dependencies]
 

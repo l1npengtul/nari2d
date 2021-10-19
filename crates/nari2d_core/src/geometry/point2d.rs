@@ -1,9 +1,10 @@
 use crate::geometry::Scale2d;
 use spade::{PointN, TwoDimensional};
+use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Rem, RemAssign, Sub, SubAssign};
 
-#[derive(Copy, Clone, Default, Debug, PartialOrd, PartialEq)]
+#[derive(Copy, Clone, Default, Debug, PartialEq)]
 pub struct Point2d {
     x: f32,
     y: f32,
@@ -432,6 +433,37 @@ impl AsMut<[f32; 2]> for Point2d {
 impl Display for Point2d {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "({}, {})", self.x, self.y)
+    }
+}
+
+impl Eq for Point2d {}
+
+// See f32::total_cmp().
+fn float_cmp(left: &f32, right: &f32) -> Ordering {
+    let mut left = left.to_bits() as i32;
+    let mut right = right.to_bits() as i32;
+
+    left ^= (((left >> 31) as u32) >> 1) as i32;
+    right ^= (((right >> 31) as u32) >> 1) as i32;
+
+    left.cmp(&right)
+}
+
+impl Ord for Point2d {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match float_cmp(&self.x, &other.y) {
+            Ordering::Less => Ordering::Less,
+            Ordering::Equal => float_cmp(&self.y, &other.y),
+            Ordering::Greater => Ordering::Greater,
+        }
+    }
+}
+
+// In order of X coords, then Y Coords
+impl PartialOrd for Point2d {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 

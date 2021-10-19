@@ -9,5 +9,4 @@ pub mod asset;
 pub mod error;
 pub mod geometry;
 mod macros;
-pub mod mesh;
 pub mod traits;
