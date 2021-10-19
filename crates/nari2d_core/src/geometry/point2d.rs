@@ -1,8 +1,10 @@
 use crate::geometry::Scale2d;
-use spade::{PointN, TwoDimensional};
-use std::cmp::Ordering;
-use std::fmt::{Display, Formatter};
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Rem, RemAssign, Sub, SubAssign};
+use rstar::{RTreeObject, AABB};
+use std::{
+    cmp::Ordering,
+    fmt::{Display, Formatter},
+    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Rem, RemAssign, Sub, SubAssign},
+};
 
 #[derive(Copy, Clone, Default, Debug, PartialEq)]
 pub struct Point2d {
@@ -240,6 +242,7 @@ impl Sub<f32> for Point2d {
 
 impl Mul<f32> for Point2d {
     type Output = Point2d;
+
     #[inline]
     fn mul(self, rhs: f32) -> Self::Output {
         Point2d {
@@ -251,6 +254,7 @@ impl Mul<f32> for Point2d {
 
 impl Div<f32> for Point2d {
     type Output = Point2d;
+
     #[inline]
     fn div(self, rhs: f32) -> Self::Output {
         Point2d {
@@ -262,6 +266,7 @@ impl Div<f32> for Point2d {
 
 impl Rem<f32> for Point2d {
     type Output = Point2d;
+
     #[inline]
     fn rem(self, rhs: f32) -> Self::Output {
         Point2d {
@@ -354,6 +359,7 @@ impl Sub for &Point2d {
 impl Add<f32> for &Point2d {
     type Output = Point2d;
 
+    #[inline]
     fn add(self, rhs: f32) -> Self::Output {
         Point2d {
             x: self.x + rhs,
@@ -365,6 +371,7 @@ impl Add<f32> for &Point2d {
 impl Sub<f32> for &Point2d {
     type Output = Point2d;
 
+    #[inline]
     fn sub(self, rhs: f32) -> Self::Output {
         Point2d {
             x: self.x - rhs,
@@ -376,6 +383,7 @@ impl Sub<f32> for &Point2d {
 impl Mul<f32> for &Point2d {
     type Output = Point2d;
 
+    #[inline]
     fn mul(self, rhs: f32) -> Self::Output {
         Point2d {
             x: self.x * rhs,
@@ -387,6 +395,7 @@ impl Mul<f32> for &Point2d {
 impl Div<f32> for &Point2d {
     type Output = Point2d;
 
+    #[inline]
     fn div(self, rhs: f32) -> Self::Output {
         Point2d {
             x: self.x / rhs,
@@ -398,6 +407,7 @@ impl Div<f32> for &Point2d {
 impl Rem<f32> for &Point2d {
     type Output = Point2d;
 
+    #[inline]
     fn rem(self, rhs: f32) -> Self::Output {
         Point2d {
             x: self.x % rhs,
@@ -439,7 +449,7 @@ impl Display for Point2d {
 impl Eq for Point2d {}
 
 // See f32::total_cmp().
-fn float_cmp(left: &f32, right: &f32) -> Ordering {
+pub(crate) fn float_cmp(left: &f32, right: &f32) -> Ordering {
     let mut left = left.to_bits() as i32;
     let mut right = right.to_bits() as i32;
 
@@ -450,6 +460,7 @@ fn float_cmp(left: &f32, right: &f32) -> Ordering {
 }
 
 impl Ord for Point2d {
+    #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
         match float_cmp(&self.x, &other.y) {
             Ordering::Less => Ordering::Less,
@@ -467,30 +478,11 @@ impl PartialOrd for Point2d {
     }
 }
 
-impl PointN for Point2d {
-    type Scalar = f32;
+impl RTreeObject for Point2d {
+    type Envelope = AABB<[f32; 2]>;
 
     #[inline]
-    fn dimensions() -> usize {
-        2
-    }
-
-    #[inline]
-    fn from_value(value: Self::Scalar) -> Self {
-        Point2d::splat(value)
-    }
-
-    #[inline]
-    fn nth(&self, index: usize) -> &Self::Scalar {
-        let i: &[f32; 2] = self.as_ref();
-        &i[index]
-    }
-
-    #[inline]
-    fn nth_mut(&mut self, index: usize) -> &mut Self::Scalar {
-        let i: &mut [f32; 2] = self.as_mut();
-        &mut i[index]
+    fn envelope(&self) -> Self::Envelope {
+        AABB::from_point([self.x, self.y])
     }
 }
-
-impl TwoDimensional for Point2d {}
