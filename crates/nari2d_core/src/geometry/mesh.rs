@@ -103,73 +103,13 @@ impl Mesh {
             .iter()
             .map(|p| Point2d::new((p.x() - x_min) / d_max, (p.y() - y_min) / d_max))
             .collect::<Vec<Point2d>>();
+
+        // start to sort points into their own "bins"
+        let num_bins = n_points.len().nth_root(4);
+        let mut bins = vec![vec![]; num_bins]; // double indirection OOF... i wonder if this is why we use the tree instead...
     }
 
-    pub(crate) fn divide_points(
-        points: Vec<Point2d>,
-    ) -> (
-        Vec<PossibleGeometricFirstPass>,
-        Vec<PossibleGeometricFirstPass>,
-    ) {
-        let mut first_pass_vec_first = Vec::with_capacity(points.len() / 2);
-        let mut first_pass_vec_second = Vec::with_capacity(points.len() / 2);
-        let (half_1, half_2) = {
-            let size = points.len();
-            if size % 2 == 0 {
-                (
-                    three_and_two_splitter(size / 2),
-                    three_and_two_splitter((size / 2) + 1),
-                )
-            } else {
-                let split_n = three_and_two_splitter(size / 2);
-                (split_n.clone(), split_n)
-            }
-        };
-
-        // group up first half
-        let mut index = 0_usize;
-        for edges_group_n in half_1 {
-            let pt: PossibleGeometricFirstPass = if edges_group_n == 3 {
-                [
-                    points[index + edges_group_n],
-                    points[index + edges_group_n + 1],
-                    points[index + edges_group_n + 2],
-                ]
-                .into()
-            } else {
-                [
-                    points[index + edges_group_n],
-                    points[index + edges_group_n + 1],
-                ]
-                .into()
-            };
-            first_pass_vec_first.push(pt);
-            index += edges_group_n;
-        }
-        // do it again for other half
-        for edges_group_n in half_2 {
-            let pt: PossibleGeometricFirstPass = if edges_group_n == 3 {
-                [
-                    points[index + edges_group_n],
-                    points[index + edges_group_n + 1],
-                    points[index + edges_group_n + 2],
-                ]
-                .into()
-            } else {
-                [
-                    points[index + edges_group_n],
-                    points[index + edges_group_n + 1],
-                ]
-                .into()
-            };
-            first_pass_vec_second.push(pt);
-            index += edges_group_n;
-        }
-
-        (first_pass_vec_first, first_pass_vec_second)
-    }
-
-    pub fn bulk_tree(&mut self) {
+    pub fn rebulk_tree(&mut self) {
         self.input_points = RTree::bulk_load(
             self.input_points
                 .iter()
