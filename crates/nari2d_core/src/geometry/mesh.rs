@@ -1,31 +1,40 @@
-use crate::error::{NResult, Nari2DError};
-use crate::geometry::point2d::float_cmp;
-use crate::geometry::Point2d;
+use crate::{
+    error::{NResult, Nari2DError},
+    geometry::{point2d::float_cmp, Point2d},
+};
 use petgraph::{graph::NodeIndex, stable_graph::StableGraph};
 use rstar::RTree;
 use std::collections::BTreeMap;
 
-pub type Triangle = (Point2d, Point2d, Point2d);
 pub type Edge = (Point2d, Point2d);
-pub type TriangleIdx = (usize, usize, usize);
 pub type EdgeIdx = (usize, usize);
 
-#[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
-pub enum PossibleGeometricFirstPass {
-    Tri(Triangle),
-    Edge(Edge),
+// temporary triangle structs
+struct Triangle {
+    vert0: usize,
+    vert1: usize,
+    vert2: usize,
+    neighbour0: Option<usize>,
+    neighbour1: Option<usize>,
+    neighbour2: Option<usize>,
 }
 
-impl From<[Point2d; 2]> for PossibleGeometricFirstPass {
-    fn from(arr: [Point2d; 2]) -> Self {
-        PossibleGeometricFirstPass::Edge((arr[0], arr[1]))
-    }
+struct TriangleEdge {
+    triangle: usize,
 }
 
-impl From<[Point2d; 3]> for PossibleGeometricFirstPass {
-    fn from(arr: [Point2d; 3]) -> Self {
-        PossibleGeometricFirstPass::Tri((arr[0], arr[1], arr[2]))
+struct Bins {
+    bins: Vec<Vec<Point2d>>,
+}
+
+impl Bins {
+    pub fn new(n_bins: usize) -> Self {
+        Bins {
+            bins: vec![vec![]; n_bins],
+        }
     }
+
+    pub fn push(&mut self, point: Point2d) {}
 }
 
 pub struct Mesh {
@@ -75,7 +84,6 @@ impl Mesh {
         };
 
         // create the graph & tree
-        let input_point_tree = RTree::bulk_load(points.clone());
         let mesh = StableGraph::new();
 
         // normalize points
@@ -104,9 +112,9 @@ impl Mesh {
             .map(|p| Point2d::new((p.x() - x_min) / d_max, (p.y() - y_min) / d_max))
             .collect::<Vec<Point2d>>();
 
-        // start to sort points into their own "bins"
-        let num_bins = n_points.len().nth_root(4);
-        let mut bins = vec![vec![]; num_bins]; // double indirection OOF... i wonder if this is why we use the tree instead...
+        // put the points into bins
+        let nbins = n_points.len().nth_root(4);
+        let mut bins = vec![vec![]; nbins]; // rip double indirection, but im too lazy to do anything else
     }
 
     pub fn rebulk_tree(&mut self) {
@@ -117,21 +125,4 @@ impl Mesh {
                 .collect::<Vec<Point2d>>(),
         );
     }
-}
-
-fn three_and_two_splitter(index: usize) -> Vec<usize> {
-    let mut indecies_vec = vec![0_usize; index / 2];
-    let mut index = index;
-
-    while index > 0 {
-        if index % 3 == 0 && index % 2 == 0 || index % 3 == 0 {
-            index -= 3;
-            indecies_vec.push(3);
-        } else {
-            index -= 2;
-            indecies_vec.push(2);
-        }
-    }
-
-    indecies_vec
 }
