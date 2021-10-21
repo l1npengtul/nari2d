@@ -2,9 +2,8 @@ use crate::{
     error::{NResult, Nari2DError},
     geometry::{point2d::float_cmp, Point2d},
 };
-use petgraph::{graph::NodeIndex, stable_graph::StableGraph};
+use petgraph::stable_graph::StableGraph;
 use rstar::RTree;
-use std::collections::BTreeMap;
 
 pub type Edge = (Point2d, Point2d);
 pub type EdgeIdx = (usize, usize);
@@ -25,16 +24,43 @@ struct TriangleEdge {
 
 struct Bins {
     bins: Vec<Vec<Point2d>>,
+    n_bins: usize,
+    max: Point2d,
 }
 
 impl Bins {
-    pub fn new(n_bins: usize) -> Self {
+    pub fn new(n_bins: usize, y_max: f32, x_max: f32) -> Self {
         Bins {
             bins: vec![vec![]; n_bins],
+            n_bins,
+            max: Point2d::new(x_max, y_max),
         }
     }
 
-    pub fn push(&mut self, point: Point2d) {}
+    pub fn push(&mut self, point: Point2d) {
+        let i = ((0.99_f32 * (self.n_bins as f32) * point.y()) / self.max.y()) as usize;
+        let j = ((0.99_f32 * (self.n_bins as f32) * point.x()) / self.max.x()) as usize;
+
+        let b = if i % 2 == 0 {
+            i * self.n_bins + j + 1
+        } else {
+            (i + self.n_bins) * self.n_bins - j
+        };
+
+        self.bins[b].push(point);
+    }
+
+    pub fn get(&self, index: usize) -> Option<&Point2d> {
+        self.bins.iter().flatten().nth(index)
+    }
+
+    pub fn get_bin(&self, bin: usize, index: usize) -> Option<&Point2d> {
+        self.bins[bin].get(index)
+    }
+
+    pub fn to_flattened(self) -> Vec<Point2d> {
+        self.bins.into_iter().flatten().collect::<Vec<Point2d>>()
+    }
 }
 
 pub struct Mesh {
@@ -113,8 +139,8 @@ impl Mesh {
             .collect::<Vec<Point2d>>();
 
         // put the points into bins
-        let nbins = n_points.len().nth_root(4);
-        let mut bins = vec![vec![]; nbins]; // rip double indirection, but im too lazy to do anything else
+        let num_bins = (n_points.len() as f64).powf(0.25_f64).round() as usize;
+        let mut bins = vec![vec![]; num_bins]; // rip double indirection, but im too lazy to do anything else
     }
 
     pub fn rebulk_tree(&mut self) {
