@@ -4,22 +4,70 @@ use crate::{
 };
 use petgraph::stable_graph::StableGraph;
 use rstar::RTree;
+use std::cmp::Ordering;
 
 pub type Edge = (Point2d, Point2d);
 pub type EdgeIdx = (usize, usize);
 
 // temporary triangle structs
+#[derive(Clone, Default, PartialOrd, PartialEq)]
+struct TriangleList {
+    pub(crate) adjacent: Vec<usize>,
+    pub(crate) verts: Vec<usize>,
+    pub(crate) points: Vec<Point2d>,
+}
+
+#[derive(Copy, Clone, PartialEq)]
 struct Triangle {
-    vert0: usize,
-    vert1: usize,
-    vert2: usize,
-    neighbour0: Option<usize>,
-    neighbour1: Option<usize>,
-    neighbour2: Option<usize>,
+    pub(crate) point_idx: [Point2d; 3],
+    pub(crate) adj_tri_idx: [usize; 3],
+}
+
+impl Triangle {
+    pub(crate) fn sort_ccw(&mut self) {
+        // CCW is the left most point, then the highest point that isnt the first point
+        self.point_idx.sort();
+        // find second highest point
+        let height_y_idx: usize = match float_cmp(&self.point_idx[1].y(), &self.point_idx[2].y()) {
+            Ordering::Less => 2,
+            Ordering::Equal => {
+                // in case its equal its the rightmost point
+                match float_cmp(&self.point_idx[1].x(), &self.point_idx[2].x()) {
+                    Ordering::Less => 2,
+                    Ordering::Equal => {
+                        // this shouldn't happen at all!
+                        dbg!("POINT EQUAL - WHAT???");
+                        1
+                    }
+                    Ordering::Greater => 1,
+                }
+            }
+            Ordering::Greater => 1,
+        };
+
+        if height_y_idx == 2 {
+            self.point_idx.swap(1, 2);
+        }
+    }
+
+    // CW is CCW but (a, b, c) => (a, c ,b)
+    pub(crate) fn sort_cw(&mut self) {
+        self.sort_ccw();
+        self.point_idx.swap(1, 2);
+    }
+}
+
+#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+enum TriEdgeIdx {
+    First = 0,
+    Second = 1,
+    Third = 2,
 }
 
 struct TriangleEdge {
-    triangle: usize,
+    pub(crate) triangle_idx: usize,
+    pub(crate) local_tri_edge: TriEdgeIdx,
+    pub(crate) edges_point_idx: [usize; 2],
 }
 
 struct Bins {
