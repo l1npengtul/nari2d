@@ -59,20 +59,20 @@ impl Angle {
 
     #[inline]
     #[must_use]
-    pub fn sin(self) -> f32 {
-        self.radians.sin()
+    pub fn sin(self) -> Angle {
+        Angle::from_radians(self.radians.sin())
     }
 
     #[inline]
     #[must_use]
-    pub fn cos(self) -> f32 {
-        self.radians.cos()
+    pub fn cos(self) -> Angle {
+        Angle::from_radians(self.radians.cos())
     }
 
     #[inline]
     #[must_use]
-    pub fn tan(self) -> f32 {
-        self.radians.tan()
+    pub fn tan(self) -> Angle {
+        Angle::from_radians(self.radians.tan())
     }
 
     #[inline]

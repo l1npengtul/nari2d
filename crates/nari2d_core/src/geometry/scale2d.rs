@@ -1,3 +1,4 @@
+use crate::geometry::Point2d;
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 
@@ -363,6 +364,12 @@ impl From<[f32; 2]> for Scale2d {
 impl From<(f32, f32)> for Scale2d {
     fn from(from: (f32, f32)) -> Self {
         Scale2d::new(from.0, from.1)
+    }
+}
+
+impl From<Point2d> for Scale2d {
+    fn from(from: Point2d) -> Self {
+        Scale2d::new(from.x(), from.y())
     }
 }
 

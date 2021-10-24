@@ -1,12 +1,13 @@
-use crate::geometry::Scale2d;
+use crate::geometry::{Angle, Scale2d};
 use rstar::{RTreeObject, AABB};
+use std::hash::{Hash, Hasher};
 use std::{
     cmp::Ordering,
     fmt::{Display, Formatter},
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Rem, RemAssign, Sub, SubAssign},
 };
 
-#[derive(Copy, Clone, Default, Debug, PartialEq)]
+#[derive(Copy, Clone, Default, Debug)]
 pub struct Point2d {
     x: f32,
     y: f32,
@@ -35,6 +36,24 @@ impl Point2d {
     #[must_use]
     pub fn origin() -> Self {
         Point2d::default()
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn float_min() -> Self {
+        Point2d {
+            x: f32::MIN,
+            y: f32::MIN,
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn float_max() -> Self {
+        Point2d {
+            x: f32::MAX,
+            y: f32::MAX,
+        }
     }
 
     #[inline]
@@ -189,6 +208,51 @@ impl Point2d {
     #[must_use]
     pub fn distance_to(&self, other: Point2d) -> f32 {
         f32::hypot(self.x - other.x, self.y - other.y)
+    }
+
+    #[inline]
+    pub fn rotate(&self, angle: Angle, center: Point2d) -> Point2d {
+        let temp_translated = self.re_center(center, Point2d::zero());
+        let sine = angle.sin().radians();
+        let cosine = angle.cos().radians();
+
+        let x_rot = (cosine * temp_translated.x()) - (sine * temp_translated.y());
+        let y_rot = (sine * temp_translated.x()) + (cosine * temp_translated.y());
+
+        Point2d::new(x_rot, y_rot) + center
+    }
+
+    #[inline]
+    pub fn rotate_origin(&self, angle: Angle) -> Self {
+        let sine = angle.sin().radians();
+        let cosine = angle.cos().radians();
+
+        let x_rot = (cosine * self.x()) - (sine * self.y());
+        let y_rot = (sine * self.x()) + (cosine * self.y());
+
+        Point2d::new(x_rot, y_rot)
+    }
+
+    #[inline]
+    pub fn is_nan(&self) -> bool {
+        if self.x.is_nan() {
+            return true;
+        }
+        if self.y.is_nan() {
+            return true;
+        }
+        false
+    }
+
+    #[inline]
+    pub fn is_infinite(&self) -> bool {
+        if self.x.is_infinite() {
+            return true;
+        }
+        if self.y.is_infinite() {
+            return true;
+        }
+        false
     }
 }
 
@@ -428,6 +492,12 @@ impl From<(f32, f32)> for Point2d {
     }
 }
 
+impl From<Scale2d> for Point2d {
+    fn from(from: Scale2d) -> Self {
+        Point2d::new(from.x(), from.y())
+    }
+}
+
 impl AsRef<[f32; 2]> for Point2d {
     fn as_ref(&self) -> &[f32; 2] {
         unsafe { &*(self as *const crate::geometry::point2d::Point2d).cast::<[f32; 2]>() }
@@ -443,6 +513,45 @@ impl AsMut<[f32; 2]> for Point2d {
 impl Display for Point2d {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "({}, {})", self.x, self.y)
+    }
+}
+
+impl PartialEq for Point2d {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        if self.is_infinite() == other.is_infinite() {
+            return true;
+        }
+        if self.is_nan() == other.is_nan() {
+            return true;
+        }
+
+        let epsilon_x = (2_f32 * f32::abs(self.x - other.x)) / (self.x.abs() + other.x.abs());
+        let epsilon_y = (2_f32 * f32::abs(self.y - other.y)) / (self.y.abs() + other.y.abs());
+
+        if (self.x == other.x || (f32::abs(self.x - other.x) <= epsilon_x))
+            && (self.y == other.y || (f32::abs(self.y - other.y) <= epsilon_y))
+        {
+            return true;
+        }
+
+        false
+    }
+}
+
+impl Hash for Point2d {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let data = if self.is_nan() {
+            f64::NAN.to_bits()
+        } else if self.is_infinite() {
+            f64::INFINITY.to_bits()
+        } else {
+            let a: [u8; 4] = self.x.to_bits().to_ne_bytes();
+            let b: [u8; 4] = self.y.to_bits().to_ne_bytes();
+            let c = [a[0], a[1], a[2], a[3], b[0], b[1], b[2], b[3]];
+            u64::from_ne_bytes(c)
+        };
+        data.hash(state)
     }
 }
 
