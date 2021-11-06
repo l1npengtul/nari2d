@@ -28,74 +28,71 @@ impl Bounds {
             extend: scale,
         }
     }
-    
+
     #[inline]
     pub fn from_points(min: Point2d, max: Point2d) -> Self {
-        let center = (min + max) / 2_f32;
+        let center = (min + max) / 2_f64;
         let extend: Scale2d = (max - center).into();
-        
-        Bounds {
-            center,
-            extend,
-        }
+
+        Bounds { center, extend }
     }
 
     #[inline]
     pub fn center(&self) -> Point2d {
         self.center
     }
-    
+
     #[inline]
-    pub fn center_x(&self) -> f32 {
+    pub fn center_x(&self) -> f64 {
         self.center.x()
     }
-    
+
     #[inline]
-    pub fn center_y(&self) -> f32 {
+    pub fn center_y(&self) -> f64 {
         self.center.y()
     }
     #[inline]
     pub fn extends(&self) -> Scale2d {
         self.extend
     }
-    
+
     #[inline]
-    pub fn extends_x(&self) -> f32 {
+    pub fn extends_x(&self) -> f64 {
         self.extend.x()
     }
-    
+
     #[inline]
-    pub fn extends_y(&self) -> f32 {
+    pub fn extends_y(&self) -> f64 {
         self.extend.y()
     }
-    
+
     #[inline]
     pub fn size(&self) -> Scale2d {
-        self.extend * 2_f32
+        self.extend * 2_f64
     }
-    
+
     #[inline]
-    pub fn size_x(&self) -> f32 {
-        self.extends_x() * 2_f32
+    pub fn size_x(&self) -> f64 {
+        self.extends_x() * 2_f64
     }
-    
+
     #[inline]
-    pub fn size_y(&self) -> f32 {
-        self.extends_y() * 2_f32
+    pub fn size_y(&self) -> f64 {
+        self.extends_y() * 2_f64
     }
-    
+
     #[inline]
     pub fn set_center(&mut self, new_center: Point2d) {
         self.center = new_center;
     }
 
     #[inline]
-    pub fn set_center_x(&mut self, new_x: f32) {
+    pub fn set_center_x(&mut self, new_x: f64) {
         self.center.set_x(new_x)
     }
 
     #[inline]
-    pub fn set_center_y(&mut self, new_y: f32) {
+    pub fn set_center_y(&mut self, new_y: f64) {
         self.center.set_y(new_y)
     }
 
@@ -105,12 +102,12 @@ impl Bounds {
     }
 
     #[inline]
-    pub fn set_extend_x(&mut self, new_x: f32) {
+    pub fn set_extend_x(&mut self, new_x: f64) {
         self.extend.set_x(new_x)
     }
 
     #[inline]
-    pub fn set_extend_y(&mut self, new_y: f32) {
+    pub fn set_extend_y(&mut self, new_y: f64) {
         self.extend.set_y(new_y)
     }
 }

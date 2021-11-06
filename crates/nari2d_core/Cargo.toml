@@ -19,6 +19,7 @@ dashmap = "^4.0"
 ahash = "^0.7"
 rstar = "^0.9"
 cdt = "0.1.0"
+delaunator = "1.0.1"
 
 [dependencies.image]
 version = "^0.23"

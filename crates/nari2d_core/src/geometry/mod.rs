@@ -5,7 +5,7 @@ use std::ops::{Deref, DerefMut};
 
 mod angle;
 mod bounds;
-pub mod mesh;
+mod mesh;
 mod point2d;
 mod scale2d;
 
@@ -28,9 +28,9 @@ pub fn angles_of_triangle(p1_a: Point2d, p2_b: Point2d, p3_c: Point2d) -> (Angle
     let a_2 = a.powi(2);
     let b_2 = b.powi(2);
     let c_2 = c.powi(2);
-    let angle_a = Angle::from_radians(f32::acos((b_2 + c_2 - a_2) / (2_f32 * b * c))).positive();
-    let angle_b = Angle::from_radians(f32::acos((a_2 + c_2 - b_2) / (2_f32 * a * c))).positive();
-    let angle_c = Angle::from_radians(f32::acos((a_2 + b_2 - c_2) / (2_f32 * a * b))).positive();
+    let angle_a = Angle::from_radians(f64::acos((b_2 + c_2 - a_2) / (2_f64 * b * c))).positive();
+    let angle_b = Angle::from_radians(f64::acos((a_2 + c_2 - b_2) / (2_f64 * a * c))).positive();
+    let angle_c = Angle::from_radians(f64::acos((a_2 + b_2 - c_2) / (2_f64 * a * b))).positive();
     (angle_a, angle_b, angle_c)
 }
 

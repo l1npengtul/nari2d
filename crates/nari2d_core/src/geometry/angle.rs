@@ -2,44 +2,44 @@ use crate::geometry::Point2d;
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Rem, RemAssign, Sub, SubAssign};
 
-const TWO_PI: f32 = std::f32::consts::PI * 2_f32;
-const PI: f32 = std::f32::consts::PI;
+const TWO_PI: f64 = std::f64::consts::PI * 2_f64;
+const PI: f64 = std::f64::consts::PI;
 
 #[derive(Copy, Clone, Default, Debug, PartialOrd, PartialEq)]
 pub struct Angle {
-    radians: f32,
+    radians: f64,
 }
 
 impl Angle {
     #[inline]
     #[must_use]
-    pub fn new(radians: f32) -> Angle {
+    pub fn new(radians: f64) -> Angle {
         Angle { radians }
     }
 
     #[inline]
     #[must_use]
-    pub fn from_radians(radians: f32) -> Angle {
+    pub fn from_radians(radians: f64) -> Angle {
         Angle::new(radians)
     }
 
     #[inline]
     #[must_use]
-    pub fn from_degrees(degrees: f32) -> Angle {
+    pub fn from_degrees(degrees: f64) -> Angle {
         let radians = degrees.to_degrees();
         Angle::new(radians)
     }
 
     #[inline]
     #[must_use]
-    pub fn radians(self) -> f32 {
+    pub fn radians(self) -> f64 {
         self.radians
     }
 
     #[inline]
-    pub fn set_radians(&mut self, new_radians: f32) {
+    pub fn set_radians(&mut self, new_radians: f64) {
         let mut angle = new_radians % TWO_PI;
-        if angle < 0_f32 {
+        if angle < 0_f64 {
             angle += TWO_PI;
         }
 
@@ -53,7 +53,7 @@ impl Angle {
 
     #[inline]
     #[must_use]
-    pub fn degrees(self) -> f32 {
+    pub fn degrees(self) -> f64 {
         self.radians.to_degrees()
     }
 
@@ -79,7 +79,7 @@ impl Angle {
     #[must_use]
     pub fn positive(self) -> Self {
         let mut angle = self.radians % TWO_PI;
-        if angle < 0_f32 {
+        if angle < 0_f64 {
             angle += TWO_PI;
         }
         Angle::new(angle)
@@ -176,92 +176,92 @@ impl Rem for &Angle {
     }
 }
 
-impl Add<f32> for Angle {
+impl Add<f64> for Angle {
     type Output = Angle;
 
     #[inline]
-    fn add(self, rhs: f32) -> Self::Output {
+    fn add(self, rhs: f64) -> Self::Output {
         Angle::new(self.radians + rhs).positive()
     }
 }
 
-impl Sub<f32> for Angle {
+impl Sub<f64> for Angle {
     type Output = Angle;
 
     #[inline]
-    fn sub(self, rhs: f32) -> Self::Output {
+    fn sub(self, rhs: f64) -> Self::Output {
         Angle::new(self.radians - rhs).positive()
     }
 }
 
-impl Mul<f32> for Angle {
+impl Mul<f64> for Angle {
     type Output = Angle;
 
     #[inline]
-    fn mul(self, rhs: f32) -> Self::Output {
+    fn mul(self, rhs: f64) -> Self::Output {
         Angle::new(self.radians * rhs).positive()
     }
 }
 
-impl Div<f32> for Angle {
+impl Div<f64> for Angle {
     type Output = Angle;
 
     #[inline]
-    fn div(self, rhs: f32) -> Self::Output {
+    fn div(self, rhs: f64) -> Self::Output {
         Angle::new(self.radians / rhs).positive()
     }
 }
 
-impl Rem<f32> for Angle {
+impl Rem<f64> for Angle {
     type Output = Angle;
 
     #[inline]
-    fn rem(self, rhs: f32) -> Self::Output {
+    fn rem(self, rhs: f64) -> Self::Output {
         Angle::new(self.radians % rhs).positive()
     }
 }
 
-impl Add<f32> for &Angle {
+impl Add<f64> for &Angle {
     type Output = Angle;
 
     #[inline]
-    fn add(self, rhs: f32) -> Self::Output {
+    fn add(self, rhs: f64) -> Self::Output {
         Angle::new(self.radians + rhs).positive()
     }
 }
 
-impl Sub<f32> for &Angle {
+impl Sub<f64> for &Angle {
     type Output = Angle;
 
     #[inline]
-    fn sub(self, rhs: f32) -> Self::Output {
+    fn sub(self, rhs: f64) -> Self::Output {
         Angle::new(self.radians - rhs).positive()
     }
 }
 
-impl Mul<f32> for &Angle {
+impl Mul<f64> for &Angle {
     type Output = Angle;
 
     #[inline]
-    fn mul(self, rhs: f32) -> Self::Output {
+    fn mul(self, rhs: f64) -> Self::Output {
         Angle::new(self.radians * rhs).positive()
     }
 }
 
-impl Div<f32> for &Angle {
+impl Div<f64> for &Angle {
     type Output = Angle;
 
     #[inline]
-    fn div(self, rhs: f32) -> Self::Output {
+    fn div(self, rhs: f64) -> Self::Output {
         Angle::new(self.radians / rhs).positive()
     }
 }
 
-impl Rem<f32> for &Angle {
+impl Rem<f64> for &Angle {
     type Output = Angle;
 
     #[inline]
-    fn rem(self, rhs: f32) -> Self::Output {
+    fn rem(self, rhs: f64) -> Self::Output {
         Angle::new(self.radians % rhs).positive()
     }
 }
@@ -301,37 +301,37 @@ impl RemAssign for Angle {
     }
 }
 
-impl AddAssign<f32> for Angle {
+impl AddAssign<f64> for Angle {
     #[inline]
-    fn add_assign(&mut self, rhs: f32) {
+    fn add_assign(&mut self, rhs: f64) {
         self.set_radians(self.radians + rhs);
     }
 }
 
-impl SubAssign<f32> for Angle {
+impl SubAssign<f64> for Angle {
     #[inline]
-    fn sub_assign(&mut self, rhs: f32) {
+    fn sub_assign(&mut self, rhs: f64) {
         self.set_radians(self.radians - rhs);
     }
 }
 
-impl MulAssign<f32> for Angle {
+impl MulAssign<f64> for Angle {
     #[inline]
-    fn mul_assign(&mut self, rhs: f32) {
+    fn mul_assign(&mut self, rhs: f64) {
         self.set_radians(self.radians * rhs);
     }
 }
 
-impl DivAssign<f32> for Angle {
+impl DivAssign<f64> for Angle {
     #[inline]
-    fn div_assign(&mut self, rhs: f32) {
+    fn div_assign(&mut self, rhs: f64) {
         self.set_radians(self.radians / rhs);
     }
 }
 
-impl RemAssign<f32> for Angle {
+impl RemAssign<f64> for Angle {
     #[inline]
-    fn rem_assign(&mut self, rhs: f32) {
+    fn rem_assign(&mut self, rhs: f64) {
         self.set_radians(self.radians % rhs);
     }
 }
