@@ -1,3 +1,7 @@
+// Modified from delaunator crate to support f32 types.
+
+pub static EPSILON: f32 = f32::EPSILON * 2_f32;
+
 pub struct TriangleMesh {
     triangles: Vec<usize>,
     halfedges: Vec<usize>,

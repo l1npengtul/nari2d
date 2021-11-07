@@ -1,28 +1,29 @@
 use crate::geometry::{Angle, Scale2d};
 use rstar::{RTreeObject, AABB};
-use std::hash::{Hash, Hasher};
 use std::{
     cmp::Ordering,
     fmt::{Display, Formatter},
+    hash::{Hash, Hasher},
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Rem, RemAssign, Sub, SubAssign},
 };
 
 #[derive(Copy, Clone, Default, Debug)]
+#[repr(C)]
 pub struct Point2d {
-    x: f64,
-    y: f64,
+    x: f32,
+    y: f32,
 }
 
 impl Point2d {
     #[inline]
     #[must_use]
-    pub fn new(x: f64, y: f64) -> Self {
+    pub fn new(x: f32, y: f32) -> Self {
         Point2d { x, y }
     }
 
     #[inline]
     #[must_use]
-    pub fn splat(v: f64) -> Self {
+    pub fn splat(v: f32) -> Self {
         Point2d { x: v, y: v }
     }
 
@@ -42,8 +43,8 @@ impl Point2d {
     #[must_use]
     pub fn float_min() -> Self {
         Point2d {
-            x: f64::MIN,
-            y: f64::MIN,
+            x: f32::MIN,
+            y: f32::MIN,
         }
     }
 
@@ -51,48 +52,48 @@ impl Point2d {
     #[must_use]
     pub fn float_max() -> Self {
         Point2d {
-            x: f64::MAX,
-            y: f64::MAX,
+            x: f32::MAX,
+            y: f32::MAX,
         }
     }
 
     #[inline]
     #[must_use]
-    pub fn to_array(self) -> [f64; 2] {
+    pub fn to_array(self) -> [f32; 2] {
         [self.x, self.y]
     }
 
     #[inline]
     #[must_use]
-    pub fn to_tuple(self) -> (f64, f64) {
+    pub fn to_tuple(self) -> (f32, f32) {
         (self.x, self.y)
     }
 
     #[inline]
     #[must_use]
-    pub fn to_vec(self) -> Vec<f64> {
+    pub fn to_vec(self) -> Vec<f32> {
         vec![self.x, self.y]
     }
 
     #[inline]
     #[must_use]
-    pub fn x(self) -> f64 {
+    pub fn x(self) -> f32 {
         self.x
     }
 
     #[inline]
-    pub fn set_x(&mut self, new_x: f64) {
+    pub fn set_x(&mut self, new_x: f32) {
         self.x = new_x;
     }
 
     #[inline]
     #[must_use]
-    pub fn y(self) -> f64 {
+    pub fn y(self) -> f32 {
         self.y
     }
 
     #[inline]
-    pub fn set_y(&mut self, new_y: f64) {
+    pub fn set_y(&mut self, new_y: f32) {
         self.y = new_y;
     }
 
@@ -159,8 +160,8 @@ impl Point2d {
 
     #[inline]
     #[must_use]
-    pub fn linear_interpolate(self, end: Point2d, along: f64) -> Self {
-        let along = along.clamp(0_f64, 1_f64);
+    pub fn linear_interpolate(self, end: Point2d, along: f32) -> Self {
+        let along = along.clamp(0_f32, 1_f32);
         Point2d {
             x: self.x + (end.x - self.x) * along,
             y: self.y + (end.y - self.y) * along,
@@ -206,8 +207,8 @@ impl Point2d {
 
     #[inline]
     #[must_use]
-    pub fn distance_to(&self, other: Point2d) -> f64 {
-        f64::hypot(self.x - other.x, self.y - other.y)
+    pub fn distance_to(&self, other: Point2d) -> f32 {
+        f32::hypot(self.x - other.x, self.y - other.y)
     }
 
     #[inline]
@@ -280,11 +281,11 @@ impl Sub for Point2d {
     }
 }
 
-impl Add<f64> for Point2d {
+impl Add<f32> for Point2d {
     type Output = Point2d;
 
     #[inline]
-    fn add(self, rhs: f64) -> Self::Output {
+    fn add(self, rhs: f32) -> Self::Output {
         Point2d {
             x: self.x + rhs,
             y: self.y + rhs,
@@ -292,11 +293,11 @@ impl Add<f64> for Point2d {
     }
 }
 
-impl Sub<f64> for Point2d {
+impl Sub<f32> for Point2d {
     type Output = Point2d;
 
     #[inline]
-    fn sub(self, rhs: f64) -> Self::Output {
+    fn sub(self, rhs: f32) -> Self::Output {
         Point2d {
             x: self.x - rhs,
             y: self.y - rhs,
@@ -304,11 +305,11 @@ impl Sub<f64> for Point2d {
     }
 }
 
-impl Mul<f64> for Point2d {
+impl Mul<f32> for Point2d {
     type Output = Point2d;
 
     #[inline]
-    fn mul(self, rhs: f64) -> Self::Output {
+    fn mul(self, rhs: f32) -> Self::Output {
         Point2d {
             x: self.x * rhs,
             y: self.y * rhs,
@@ -316,11 +317,11 @@ impl Mul<f64> for Point2d {
     }
 }
 
-impl Div<f64> for Point2d {
+impl Div<f32> for Point2d {
     type Output = Point2d;
 
     #[inline]
-    fn div(self, rhs: f64) -> Self::Output {
+    fn div(self, rhs: f32) -> Self::Output {
         Point2d {
             x: self.x / rhs,
             y: self.y / rhs,
@@ -328,11 +329,11 @@ impl Div<f64> for Point2d {
     }
 }
 
-impl Rem<f64> for Point2d {
+impl Rem<f32> for Point2d {
     type Output = Point2d;
 
     #[inline]
-    fn rem(self, rhs: f64) -> Self::Output {
+    fn rem(self, rhs: f32) -> Self::Output {
         Point2d {
             x: self.x % rhs,
             y: self.y % rhs,
@@ -356,41 +357,41 @@ impl SubAssign for Point2d {
     }
 }
 
-impl AddAssign<f64> for Point2d {
+impl AddAssign<f32> for Point2d {
     #[inline]
-    fn add_assign(&mut self, rhs: f64) {
+    fn add_assign(&mut self, rhs: f32) {
         self.set_x(self.x() + rhs);
         self.set_y(self.y() + rhs);
     }
 }
 
-impl SubAssign<f64> for Point2d {
+impl SubAssign<f32> for Point2d {
     #[inline]
-    fn sub_assign(&mut self, rhs: f64) {
+    fn sub_assign(&mut self, rhs: f32) {
         self.set_x(self.x() - rhs);
         self.set_y(self.y() - rhs);
     }
 }
 
-impl MulAssign<f64> for Point2d {
+impl MulAssign<f32> for Point2d {
     #[inline]
-    fn mul_assign(&mut self, rhs: f64) {
+    fn mul_assign(&mut self, rhs: f32) {
         self.set_x(self.x() * rhs);
         self.set_y(self.y() * rhs);
     }
 }
 
-impl DivAssign<f64> for Point2d {
+impl DivAssign<f32> for Point2d {
     #[inline]
-    fn div_assign(&mut self, rhs: f64) {
+    fn div_assign(&mut self, rhs: f32) {
         self.set_x(self.x() / rhs);
         self.set_y(self.y() / rhs);
     }
 }
 
-impl RemAssign<f64> for Point2d {
+impl RemAssign<f32> for Point2d {
     #[inline]
-    fn rem_assign(&mut self, rhs: f64) {
+    fn rem_assign(&mut self, rhs: f32) {
         self.set_x(self.x() / rhs);
         self.set_y(self.y() / rhs);
     }
@@ -420,11 +421,11 @@ impl Sub for &Point2d {
     }
 }
 
-impl Add<f64> for &Point2d {
+impl Add<f32> for &Point2d {
     type Output = Point2d;
 
     #[inline]
-    fn add(self, rhs: f64) -> Self::Output {
+    fn add(self, rhs: f32) -> Self::Output {
         Point2d {
             x: self.x + rhs,
             y: self.y + rhs,
@@ -432,11 +433,11 @@ impl Add<f64> for &Point2d {
     }
 }
 
-impl Sub<f64> for &Point2d {
+impl Sub<f32> for &Point2d {
     type Output = Point2d;
 
     #[inline]
-    fn sub(self, rhs: f64) -> Self::Output {
+    fn sub(self, rhs: f32) -> Self::Output {
         Point2d {
             x: self.x - rhs,
             y: self.y - rhs,
@@ -444,11 +445,11 @@ impl Sub<f64> for &Point2d {
     }
 }
 
-impl Mul<f64> for &Point2d {
+impl Mul<f32> for &Point2d {
     type Output = Point2d;
 
     #[inline]
-    fn mul(self, rhs: f64) -> Self::Output {
+    fn mul(self, rhs: f32) -> Self::Output {
         Point2d {
             x: self.x * rhs,
             y: self.y * rhs,
@@ -456,11 +457,11 @@ impl Mul<f64> for &Point2d {
     }
 }
 
-impl Div<f64> for &Point2d {
+impl Div<f32> for &Point2d {
     type Output = Point2d;
 
     #[inline]
-    fn div(self, rhs: f64) -> Self::Output {
+    fn div(self, rhs: f32) -> Self::Output {
         Point2d {
             x: self.x / rhs,
             y: self.y / rhs,
@@ -468,11 +469,11 @@ impl Div<f64> for &Point2d {
     }
 }
 
-impl Rem<f64> for &Point2d {
+impl Rem<f32> for &Point2d {
     type Output = Point2d;
 
     #[inline]
-    fn rem(self, rhs: f64) -> Self::Output {
+    fn rem(self, rhs: f32) -> Self::Output {
         Point2d {
             x: self.x % rhs,
             y: self.y % rhs,
@@ -480,14 +481,14 @@ impl Rem<f64> for &Point2d {
     }
 }
 
-impl From<[f64; 2]> for Point2d {
-    fn from(from: [f64; 2]) -> Self {
+impl From<[f32; 2]> for Point2d {
+    fn from(from: [f32; 2]) -> Self {
         Point2d::new(from[0], from[1])
     }
 }
 
-impl From<(f64, f64)> for Point2d {
-    fn from(from: (f64, f64)) -> Self {
+impl From<(f32, f32)> for Point2d {
+    fn from(from: (f32, f32)) -> Self {
         Point2d::new(from.0, from.1)
     }
 }
@@ -498,15 +499,15 @@ impl From<Scale2d> for Point2d {
     }
 }
 
-impl AsRef<[f64; 2]> for Point2d {
-    fn as_ref(&self) -> &[f64; 2] {
-        unsafe { &*(self as *const crate::geometry::point2d::Point2d).cast::<[f64; 2]>() }
+impl AsRef<[f32; 2]> for Point2d {
+    fn as_ref(&self) -> &[f32; 2] {
+        unsafe { &*(self as *const crate::geometry::point2d::Point2d).cast::<[f32; 2]>() }
     }
 }
 
-impl AsMut<[f64; 2]> for Point2d {
-    fn as_mut(&mut self) -> &mut [f64; 2] {
-        unsafe { &mut *(self as *mut crate::geometry::point2d::Point2d).cast::<[f64; 2]>() }
+impl AsMut<[f32; 2]> for Point2d {
+    fn as_mut(&mut self) -> &mut [f32; 2] {
+        unsafe { &mut *(self as *mut crate::geometry::point2d::Point2d).cast::<[f32; 2]>() }
     }
 }
 
@@ -526,11 +527,11 @@ impl PartialEq for Point2d {
             return true;
         }
 
-        let epsilon_x = (2_f64 * f64::abs(self.x - other.x)) / (self.x.abs() + other.x.abs());
-        let epsilon_y = (2_f64 * f64::abs(self.y - other.y)) / (self.y.abs() + other.y.abs());
+        let epsilon_x = (2_f32 * f32::abs(self.x - other.x)) / (self.x.abs() + other.x.abs());
+        let epsilon_y = (2_f32 * f32::abs(self.y - other.y)) / (self.y.abs() + other.y.abs());
 
-        if (self.x == other.x || (f64::abs(self.x - other.x) <= epsilon_x))
-            && (self.y == other.y || (f64::abs(self.y - other.y) <= epsilon_y))
+        if (self.x == other.x || (f32::abs(self.x - other.x) <= epsilon_x))
+            && (self.y == other.y || (f32::abs(self.y - other.y) <= epsilon_y))
         {
             return true;
         }
@@ -542,9 +543,9 @@ impl PartialEq for Point2d {
 impl Hash for Point2d {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let data = if self.is_nan() {
-            f64::NAN.to_bits()
+            f32::NAN.to_bits() as u64
         } else if self.is_infinite() {
-            f64::INFINITY.to_bits()
+            f32::INFINITY.to_bits() as u64
         } else {
             let a: [u8; 4] = self.x.to_bits().to_ne_bytes();
             let b: [u8; 4] = self.y.to_bits().to_ne_bytes();
@@ -557,8 +558,8 @@ impl Hash for Point2d {
 
 impl Eq for Point2d {}
 
-// See f64::total_cmp().
-pub(crate) fn float_cmp(left: &f64, right: &f64) -> Ordering {
+// See f32::total_cmp().
+pub(crate) fn float_cmp(left: &f32, right: &f32) -> Ordering {
     let mut left = left.to_bits() as i32;
     let mut right = right.to_bits() as i32;
 
@@ -588,7 +589,7 @@ impl PartialOrd for Point2d {
 }
 
 impl RTreeObject for Point2d {
-    type Envelope = AABB<[f64; 2]>;
+    type Envelope = AABB<[f32; 2]>;
 
     #[inline]
     fn envelope(&self) -> Self::Envelope {

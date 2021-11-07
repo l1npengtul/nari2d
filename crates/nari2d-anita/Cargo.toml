@@ -6,15 +6,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["scalar", "simd-arm-neon", "simd-wasm", "simd-x86"]
-scalar = []
-simd-arm-neon = []
+default = ["simd-aarch", "simd-arm", "simd-wasm", "simd-x86_64"]
+simd-arm = []
+simd-aarch = []
 simd-wasm = []
 simd-wgpu = ["wgpu"]
-simd-x86 = []
+simd-x86_64 = []
 
 [dependencies]
 
 [dependencies.wgpu]
-version = "0.11.0"
+version = "^0.11"
 optional = true
