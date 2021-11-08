@@ -1,4 +1,5 @@
 use crate::geometry::{Angle, Scale2d};
+use robust::{orient2d, Coord};
 use rstar::{RTreeObject, AABB};
 use std::{
     cmp::Ordering,
@@ -170,6 +171,21 @@ impl Point2d {
 
     #[inline]
     #[must_use]
+    pub fn half_way(self, other: Point2d) -> Self {
+        Point2d {
+            x: (self.x + other.x) / 2_f32,
+            y: (self.y + other.y) / 2_f32,
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn slope(self, other: Point2d) -> f32 {
+        (self.x - other.x) / (self.y - other.y)
+    }
+
+    #[inline]
+    #[must_use]
     pub fn max(self, other: Point2d) -> Self {
         Point2d {
             x: self.x.max(other.x),
@@ -254,6 +270,16 @@ impl Point2d {
             return true;
         }
         false
+    }
+
+    #[inline]
+    pub fn is_oriented_counter_clock_wise(&self, b: Point2d, c: Point2d) -> bool {
+        let orientation = orient2d(self.into(), b.into(), c.into());
+        if orientation != 0_f64 || orientation.is_sign_positive() {
+            true
+        } else {
+            false
+        }
     }
 }
 
@@ -594,5 +620,23 @@ impl RTreeObject for Point2d {
     #[inline]
     fn envelope(&self) -> Self::Envelope {
         AABB::from_point([self.x, self.y])
+    }
+}
+
+impl Into<Coord<f32>> for Point2d {
+    fn into(self) -> Coord<f32> {
+        Coord {
+            x: self.x,
+            y: self.y,
+        }
+    }
+}
+
+impl Into<Coord<f32>> for &Point2d {
+    fn into(self) -> Coord<f32> {
+        Coord {
+            x: self.x,
+            y: self.y,
+        }
     }
 }
