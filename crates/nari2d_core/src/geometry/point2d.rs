@@ -1,4 +1,4 @@
-use crate::geometry::{Angle, Scale2d};
+use crate::geometry::{Angle, IndexedPoint2d, Scale2d};
 use robust::{orient2d, Coord};
 use rstar::{Envelope, Point, PointDistance, RTreeObject, AABB};
 use std::{
@@ -522,6 +522,12 @@ impl From<(f32, f32)> for Point2d {
 impl From<Scale2d> for Point2d {
     fn from(from: Scale2d) -> Self {
         Point2d::new(from.x(), from.y())
+    }
+}
+
+impl From<IndexedPoint2d> for Point2d {
+    fn from(ipt: IndexedPoint2d) -> Self {
+        ipt.point
     }
 }
 

@@ -1,7 +1,9 @@
+use rstar::{Envelope, Point, PointDistance, RTreeObject, AABB};
+use std::ops::{Deref, DerefMut};
+
 pub use angle::Angle;
 pub use point2d::Point2d;
 pub use scale2d::Scale2d;
-use std::ops::{Deref, DerefMut};
 
 mod angle;
 mod bounds;
@@ -93,5 +95,43 @@ impl Deref for PointVec {
 impl DerefMut for PointVec {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.int
+    }
+}
+
+#[derive(Copy, Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
+pub struct IndexedPoint2d {
+    pub(crate) index: usize,
+    pub(crate) point: Point2d,
+}
+
+impl Deref for IndexedPoint2d {
+    type Target = Point2d;
+
+    fn deref(&self) -> &Self::Target {
+        &self.point
+    }
+}
+
+impl DerefMut for IndexedPoint2d {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.point
+    }
+}
+
+impl RTreeObject for IndexedPoint2d {
+    type Envelope = AABB<[f32; 2]>;
+
+    #[inline]
+    fn envelope(&self) -> Self::Envelope {
+        AABB::from_point([self.x(), self.y()])
+    }
+}
+
+impl PointDistance for IndexedPoint2d {
+    fn distance_2(
+        &self,
+        point: &<Self::Envelope as Envelope>::Point,
+    ) -> <<Self::Envelope as Envelope>::Point as Point>::Scalar {
+        f32::pow((self.x() - point[0]), 2) + f32::pow((self.y() - point[1]), 2)
     }
 }

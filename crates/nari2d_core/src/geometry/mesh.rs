@@ -1,5 +1,6 @@
 // Modified from delaunator crate to support f32 types.
 
+use crate::geometry::IndexedPoint2d;
 use crate::{
     error::{NResult, Nari2DError},
     geometry::Point2d,
@@ -217,7 +218,7 @@ impl<'a> Iterator for TriangleMeshViewer<'a> {
 
 impl<'a> IntoIterator for TriangleMeshViewer<'a> {
     type Item = Point2d;
-    type IntoIter = std::vec::IntoIter<Point2d>;
+    type IntoIter = core::slice::Iter<'a, Point2d>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.data.into_iter()
@@ -225,20 +226,53 @@ impl<'a> IntoIterator for TriangleMeshViewer<'a> {
 }
 
 // algorithm from https://www.researchgate.net/publication/220868874_Concave_hull_A_k-nearest_neighbours_approach_for_the_computation_of_the_region_occupied_by_a_set_of_points
-pub fn concave_hull(points: Vec<Point2d>) -> NResult<Vec<usize>> {
+pub fn concave_hull(points: Vec<Point2d>) -> NResult<(Vec<usize>, Vec<Point2d>)> {
+    if points.len() > 3 {
+        return Err(Nari2DError::MeshConcaveCalculation {
+            points,
+            error: "Points < 3".to_string(),
+        });
+    }
+    if points.len() == 3 {
+        Ok(vec![0, 1, 2])
+    }
+
     let mut points = points;
     points.sort();
     points.dedup();
+    let mut points = points
+        .into_iter()
+        .enumerate()
+        .map(|(index, point)| IndexedPoint2d { index, point })
+        .collect::<Vec<IndexedPoint2d>>();
 
-    let rtree = RTree::bulk_load(points.clone());
+    let mut rtree = RTree::bulk_load(points.clone());
     // get lowest y by getting the point closest to f32::MIN
-    let lowest_point = match rtree.nearest_neighbor(&[0_f32, f32::MIN]) {
-        Some(pt) => *pt,
+    let mut first_point = match rtree.nearest_neighbor(&[0_f32, f32::MIN]) {
+        Some(pt) => {
+            rtree.remove(pt);
+            *pt
+        }
         None => {
             return Err(Nari2DError::MeshConcaveCalculation {
-                points,
+                points: points.into(),
                 error: "No lowest point!".to_string(),
             })
         }
     };
+    let mut current_point = first_point;
+
+    let mut previous_angle = 0_f32;
+    let mut step = 2;
+
+    while (current_point != step || step == 2) && rtree.size() > 0 {
+        if step == 5 {
+            rtree.insert(first_point);
+        }
+
+        let k_nearest_points_iter = rtree
+            .nearest_neighbor_iter(&current_point.as_ref())
+            .take(3)
+            .collect::<Vec<IndexedPoint2d>>();
+    }
 }
