@@ -1,6 +1,6 @@
 use crate::geometry::{Angle, Scale2d};
 use robust::{orient2d, Coord};
-use rstar::{RTreeObject, AABB};
+use rstar::{Envelope, Point, PointDistance, RTreeObject, AABB};
 use std::{
     cmp::Ordering,
     fmt::{Display, Formatter},
@@ -620,6 +620,15 @@ impl RTreeObject for Point2d {
     #[inline]
     fn envelope(&self) -> Self::Envelope {
         AABB::from_point([self.x, self.y])
+    }
+}
+
+impl PointDistance for Point2d {
+    fn distance_2(
+        &self,
+        point: &<Self::Envelope as Envelope>::Point,
+    ) -> <<Self::Envelope as Envelope>::Point as Point>::Scalar {
+        f32::pow((self.x() - point[0]), 2) + f32::pow((self.y() - point[1]), 2)
     }
 }
 

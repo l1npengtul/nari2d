@@ -6,15 +6,23 @@ use crate::{
 };
 use cdt::Error;
 use delaunator::{triangulate, Point};
+use rstar::RTree;
 use std::ops::{Index, IndexMut};
 
-pub struct TriangleMesh {
+pub struct EditableTriangleMesh {
+    points: Vec<Point2d>,
+    triangles: Vec<(usize, usize, usize)>,
+    neighbours: Vec<(usize, usize, usize)>,
+    constraints: Vec<usize>,
+}
+
+pub struct VertexTriangleMesh {
     points: Vec<Point2d>,
     triangles: Vec<(usize, usize, usize)>,
     constraints: Vec<usize>,
 }
 
-impl TriangleMesh {
+impl VertexTriangleMesh {
     pub fn new(points: Vec<Point2d>, edges: Vec<usize>) -> NResult<Self> {
         // pre clean points
         // dedup via relative epsilon
@@ -43,7 +51,7 @@ impl TriangleMesh {
             }
         };
 
-        Ok(TriangleMesh {
+        Ok(VertexTriangleMesh {
             points,
             triangles: triangulation,
             constraints: edges,
@@ -108,7 +116,7 @@ impl TriangleMesh {
     }
 }
 
-impl<'a> AsRef<TriangleMeshViewer<'a>> for TriangleMesh {
+impl<'a> AsRef<TriangleMeshViewer<'a>> for VertexTriangleMesh {
     fn as_ref(&self) -> &'a TriangleMeshViewer {
         &TriangleMeshViewer {
             data: &self.points,
@@ -117,7 +125,7 @@ impl<'a> AsRef<TriangleMeshViewer<'a>> for TriangleMesh {
     }
 }
 
-impl<'a> AsMut<TriangleMeshViewerMut<'a>> for TriangleMesh {
+impl<'a> AsMut<TriangleMeshViewerMut<'a>> for VertexTriangleMesh {
     fn as_mut(&mut self) -> &mut TriangleMeshViewerMut<'a> {
         &mut TriangleMeshViewerMut {
             data: &mut self.points,
@@ -214,4 +222,23 @@ impl<'a> IntoIterator for TriangleMeshViewer<'a> {
     fn into_iter(self) -> Self::IntoIter {
         self.data.into_iter()
     }
+}
+
+// algorithm from https://www.researchgate.net/publication/220868874_Concave_hull_A_k-nearest_neighbours_approach_for_the_computation_of_the_region_occupied_by_a_set_of_points
+pub fn concave_hull(points: Vec<Point2d>) -> NResult<Vec<usize>> {
+    let mut points = points;
+    points.sort();
+    points.dedup();
+
+    let rtree = RTree::bulk_load(points.clone());
+    // get lowest y by getting the point closest to f32::MIN
+    let lowest_point = match rtree.nearest_neighbor(&[0_f32, f32::MIN]) {
+        Some(pt) => *pt,
+        None => {
+            return Err(Nari2DError::MeshConcaveCalculation {
+                points,
+                error: "No lowest point!".to_string(),
+            })
+        }
+    };
 }

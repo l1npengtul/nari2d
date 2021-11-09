@@ -12,6 +12,8 @@ pub enum Nari2DError {
     },
     #[error("No Resource {id}")]
     AssetNotFound { id: AssetID },
+    #[error("Could not calculate concave for points {points}: {error}")]
+    MeshConcaveCalculation { points: Vec<Point2d>, error: String },
     #[error("Points {points:?}, Errors during pre-processing: {error}")]
     MeshGenerationCleanup { points: Vec<Point2d>, error: String },
     #[error("Could not triangulate: {error}")]
