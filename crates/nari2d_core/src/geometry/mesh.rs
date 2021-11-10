@@ -1,6 +1,6 @@
 // Modified from delaunator crate to support f32 types.
 
-use crate::geometry::{angles_of_triangle, Angle, IndexedPoint2d};
+use crate::geometry::{angles_of_triangle, Angle, IndexedPoint2d, Orientation};
 use crate::{
     error::{NResult, Nari2DError},
     geometry::Point2d,
@@ -267,10 +267,10 @@ pub fn concave_hull(
     };
     let mut current_point = first_point;
 
-    let mut previous_angle = 0_f32;
+    let mut previous_angle = Angle::new(0_f32);
     let mut step = 2;
     let mut point_include = usize::min(point_include, rtree.size() - 1);
-    let mut hull = vec![0; points.len() / 3];
+    let mut hull = Vec::with_capacity(points.len() / 2);
     hull.push(first_point);
 
     while (current_point != step || step == 2) && rtree.size() > 0 {
@@ -308,44 +308,57 @@ pub fn concave_hull(
                 0
             };
 
-            let j = 2;
+            let mut j = 2;
             its = false;
 
-            while its == false && j < hull.len() - last_point {}
+            while its == false && j < hull.len() - last_point {
+                its = segment_intersects(
+                    [hull[step - 1].into(), k_nearest_points_iter[i].into()],
+                    [hull[step - i - j].into(), hull[step - j].into()],
+                );
+                j += 1;
+            }
         }
+
+        if its == true {
+            return concave_hull(points.into(), point_include + 1);
+        }
+
+        current_point = k_nearest_points_iter[i];
+        hull.push(current_point);
+        previous_angle =
+            Point2d::new(0_f32, 0_f32).angle_of_3(&hull[step].point, &hull[step - 1].point);
+        rtree.remove(&current_point);
+        step += 1;
     }
+
+    let mut all_inside = true;
+    i = rtree.size();
+    while all_inside == true && i > 0 {}
 }
 
-pub fn segment_intersects(
-    data: &[Point2d],
-    segment_1: (usize, usize),
-    segment_2: (usize, usize),
-) -> bool {
-    let segment_1_start = match data.get(segment_1.0) {
-        Some(pt) => pt,
-        None => {
-            return false;
-        }
-    };
+pub fn segment_intersects(segment_1: [Point2d; 2], segment_2: [Point2d; 2]) -> bool {
+    let ori_1 = Point2d::orientation(segment_1[0], segment_1[1], segment_2[0]);
+    let ori_2 = Point2d::orientation(segment_1[0], segment_1[1], segment_2[1]);
+    let ori_3 = Point2d::orientation(segment_2[0], segment_2[1], segment_1[0]);
+    let ori_4 = Point2d::orientation(segment_2[0], segment_2[1], segment_1[1]);
 
-    let segment_1_end = match data.get(segment_1.1) {
-        Some(pt) => pt,
-        None => {
-            return false;
-        }
-    };
+    if ori_1 != ori_2 && ori_3 != ori_4 {
+        return true;
+    }
 
-    let segment_2_start = match data.get(segment_2.0) {
-        Some(pt) => pt,
-        None => {
-            return false;
-        }
-    };
+    if ori_3 == Orientation::Colinear && segment_1[0].point_on_segment(segment_2[0], segment_2[1]) {
+        return true;
+    }
+    if ori_4 == Orientation::Colinear && segment_1[1].point_on_segment(segment_2[0], segment_2[1]) {
+        return true;
+    }
+    if ori_1 == Orientation::Colinear && segment_2[0].point_on_segment(segment_1[0], segment_1[1]) {
+        return true;
+    }
+    if ori_2 == Orientation::Colinear && segment_2[1].point_on_segment(segment_1[0], segment_1[1]) {
+        return true;
+    }
 
-    let segment_2_end = match data.get(segment_2.1) {
-        Some(pt) => pt,
-        None => {
-            return false;
-        }
-    };
+    false
 }

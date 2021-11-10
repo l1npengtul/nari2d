@@ -293,7 +293,7 @@ impl Point2d {
 
     #[inline]
     #[must_use]
-    pub fn orientation(&self, b: Point2d, c: Point2d) -> Orientation {
+    pub fn orientation(&self, b: &Point2d, c: &Point2d) -> Orientation {
         let slope_difference = (b.y - self.y) * (c.x - b.x) - (b.x - self.x) * (c.y - b.y);
 
         return if nearly_equal_f32(slope_difference, 0_f32) {
@@ -304,6 +304,24 @@ impl Point2d {
             Orientation::CounterClockWise
         };
     }
+
+    #[inline]
+    #[must_use]
+    pub fn point_on_segment(&self, p1: &Point2d, p2: &Point2d) -> bool {
+        if self.x <= f32::max(p1.x, p2.x)
+            && self.x >= f32::min(p1.x, p2.x)
+            && self.y <= f32::max(p1.y, p2.y)
+            && self.y >= f32::min(p1.y, p2.y)
+        {
+            return true;
+        }
+        false
+    }
+
+    #[inline]
+    #[must_use]
+    // from https://www.eecs.umich.edu/courses/eecs380/HANDOUTS/PROJ2/InsidePoly.html
+    pub fn point_in_polygon(&self, polygon: &[Point2d]) -> bool {}
 }
 
 impl Add for Point2d {

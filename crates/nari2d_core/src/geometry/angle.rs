@@ -2,8 +2,8 @@ use crate::geometry::Point2d;
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Rem, RemAssign, Sub, SubAssign};
 
-const TWO_PI: f32 = std::f32::consts::PI * 2_f32;
-const PI: f32 = std::f32::consts::PI;
+const TWO_PI: f32 = core::f32::consts::PI * 2_f32;
+const PI: f32 = core::f32::consts::PI;
 
 #[derive(Copy, Clone, Default, Debug, PartialOrd, PartialEq)]
 #[repr(C)]
@@ -14,21 +14,35 @@ pub struct Angle {
 impl Angle {
     #[inline]
     #[must_use]
-    pub fn new(radians: f32) -> Angle {
+    pub fn new(radians: f32) -> Self {
         Angle { radians }
     }
 
     #[inline]
     #[must_use]
-    pub fn from_radians(radians: f32) -> Angle {
+    pub fn from_radians(radians: f32) -> Self {
         Angle::new(radians)
     }
 
     #[inline]
     #[must_use]
-    pub fn from_degrees(degrees: f32) -> Angle {
+    pub fn from_degrees(degrees: f32) -> Self {
         let radians = degrees.to_degrees();
         Angle::new(radians)
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn from_vectors(vector1: Point2d, vector2: Point2d) -> Self {
+        let mut angle = f32::atan2(vector1.y(), vector1.x()) - f32::atan2(vector2.y(), vector2.x());
+        while angle > PI {
+            angle -= TWO_PI;
+        }
+        while angle < -PI {
+            angle += TWO_PI;
+        }
+
+        Angle::from_radians(angle)
     }
 
     #[inline]

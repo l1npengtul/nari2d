@@ -148,7 +148,7 @@ fn nearly_equal_f32(n: f32, m: f32) -> bool {
 
 #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Orientation {
-    Colinear,
-    ClockWise,
-    CounterClockWise,
+    Colinear = 0,
+    ClockWise = 1,
+    CounterClockWise = 2,
 }
