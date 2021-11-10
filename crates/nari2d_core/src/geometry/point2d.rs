@@ -1,4 +1,5 @@
-use crate::geometry::{Angle, IndexedPoint2d, Scale2d};
+use crate::geometry::{nearly_equal_f32, Angle, IndexedPoint2d, Orientation, Scale2d};
+use bevy_ecs::query::Or;
 use robust::{orient2d, Coord};
 use rstar::{Envelope, Point, PointDistance, RTreeObject, AABB};
 use std::{
@@ -161,7 +162,7 @@ impl Point2d {
 
     #[inline]
     #[must_use]
-    pub fn linear_interpolate(self, end: Point2d, along: f32) -> Self {
+    pub fn linear_interpolate(self, end: Self, along: f32) -> Self {
         let along = along.clamp(0_f32, 1_f32);
         Point2d {
             x: self.x + (end.x - self.x) * along,
@@ -171,7 +172,7 @@ impl Point2d {
 
     #[inline]
     #[must_use]
-    pub fn half_way(self, other: Point2d) -> Self {
+    pub fn half_way(self, other: Self) -> Self {
         Point2d {
             x: (self.x + other.x) / 2_f32,
             y: (self.y + other.y) / 2_f32,
@@ -180,13 +181,13 @@ impl Point2d {
 
     #[inline]
     #[must_use]
-    pub fn slope(self, other: Point2d) -> f32 {
+    pub fn slope(self, other: Self) -> f32 {
         (self.x - other.x) / (self.y - other.y)
     }
 
     #[inline]
     #[must_use]
-    pub fn max(self, other: Point2d) -> Self {
+    pub fn max(self, other: Self) -> Self {
         Point2d {
             x: self.x.max(other.x),
             y: self.y.max(other.y),
@@ -195,7 +196,7 @@ impl Point2d {
 
     #[inline]
     #[must_use]
-    pub fn min(self, other: Point2d) -> Self {
+    pub fn min(self, other: Self) -> Self {
         Point2d {
             x: self.x.min(other.x),
             y: self.y.min(other.y),
@@ -204,13 +205,13 @@ impl Point2d {
 
     #[inline]
     #[must_use]
-    pub fn clamp(self, start: Point2d, end: Point2d) -> Self {
+    pub fn clamp(self, start: Self, end: Self) -> Self {
         self.max(start).min(end)
     }
 
     #[inline]
     #[must_use]
-    pub fn re_center(self, old_center: Point2d, new_center: Point2d) -> Self {
+    pub fn re_center(self, old_center: Self, new_center: Self) -> Self {
         let difference = new_center - old_center;
         self + difference
     }
@@ -223,12 +224,12 @@ impl Point2d {
 
     #[inline]
     #[must_use]
-    pub fn distance_to(&self, other: Point2d) -> f32 {
+    pub fn distance_to(&self, other: Self) -> f32 {
         f32::hypot(self.x - other.x, self.y - other.y)
     }
 
     #[inline]
-    pub fn rotate(&self, angle: Angle, center: Point2d) -> Point2d {
+    pub fn rotate(&self, angle: Angle, center: Self) -> Self {
         let temp_translated = self.re_center(center, Point2d::zero());
         let sine = angle.sin().radians();
         let cosine = angle.cos().radians();
@@ -251,6 +252,23 @@ impl Point2d {
     }
 
     #[inline]
+    #[must_use]
+    pub fn atan2(&self, point: &Self) -> Angle {
+        let homed = point - self;
+        Angle::from_radians(homed.y().atan2(homed.x()))
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn angle_of_3(&self, point1: &Self, point2: &Self) -> Angle {
+        let homed_1 = point1 - self;
+        let homed_2 = point2 - self;
+        Angle::from_radians(homed_1.y().atan2(homed_1.x()))
+            - Angle::from_radians(homed_2.y().atan2(homed_2.x()))
+    }
+
+    #[inline]
+    #[must_use]
     pub fn is_nan(&self) -> bool {
         if self.x.is_nan() {
             return true;
@@ -262,6 +280,7 @@ impl Point2d {
     }
 
     #[inline]
+    #[must_use]
     pub fn is_infinite(&self) -> bool {
         if self.x.is_infinite() {
             return true;
@@ -273,13 +292,17 @@ impl Point2d {
     }
 
     #[inline]
-    pub fn is_oriented_counter_clock_wise(&self, b: Point2d, c: Point2d) -> bool {
-        let orientation = orient2d(self.into(), b.into(), c.into());
-        if orientation != 0_f64 || orientation.is_sign_positive() {
-            true
+    #[must_use]
+    pub fn orientation(&self, b: Point2d, c: Point2d) -> Orientation {
+        let slope_difference = (b.y - self.y) * (c.x - b.x) - (b.x - self.x) * (c.y - b.y);
+
+        return if nearly_equal_f32(slope_difference, 0_f32) {
+            Orientation::Colinear
+        } else if nearly_equal_f32(slope_difference, 1_f32) {
+            Orientation::ClockWise
         } else {
-            false
-        }
+            Orientation::CounterClockWise
+        };
     }
 }
 

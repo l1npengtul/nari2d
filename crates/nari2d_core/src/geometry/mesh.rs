@@ -1,6 +1,6 @@
 // Modified from delaunator crate to support f32 types.
 
-use crate::geometry::IndexedPoint2d;
+use crate::geometry::{angles_of_triangle, Angle, IndexedPoint2d};
 use crate::{
     error::{NResult, Nari2DError},
     geometry::Point2d,
@@ -8,6 +8,7 @@ use crate::{
 use cdt::Error;
 use delaunator::{triangulate, Point};
 use rstar::RTree;
+use std::cmp::Ordering;
 use std::ops::{Index, IndexMut};
 
 pub struct EditableTriangleMesh {
@@ -226,7 +227,11 @@ impl<'a> IntoIterator for TriangleMeshViewer<'a> {
 }
 
 // algorithm from https://www.researchgate.net/publication/220868874_Concave_hull_A_k-nearest_neighbours_approach_for_the_computation_of_the_region_occupied_by_a_set_of_points
-pub fn concave_hull(points: Vec<Point2d>) -> NResult<(Vec<usize>, Vec<Point2d>)> {
+pub fn concave_hull(
+    points: Vec<Point2d>,
+    point_include: usize,
+) -> NResult<(Vec<usize>, Vec<Point2d>)> {
+    let mut point_include = usize::max(point_include, 3_usize);
     if points.len() > 3 {
         return Err(Nari2DError::MeshConcaveCalculation {
             points,
@@ -264,15 +269,83 @@ pub fn concave_hull(points: Vec<Point2d>) -> NResult<(Vec<usize>, Vec<Point2d>)>
 
     let mut previous_angle = 0_f32;
     let mut step = 2;
+    let mut point_include = usize::min(point_include, rtree.size() - 1);
+    let mut hull = vec![0; points.len() / 3];
+    hull.push(first_point);
 
     while (current_point != step || step == 2) && rtree.size() > 0 {
         if step == 5 {
             rtree.insert(first_point);
         }
 
-        let k_nearest_points_iter = rtree
+        let mut k_nearest_points_iter = rtree
             .nearest_neighbor_iter(&current_point.as_ref())
-            .take(3)
+            .take(point_include)
             .collect::<Vec<IndexedPoint2d>>();
+
+        k_nearest_points_iter.sort_by(|pt_1, pt_2| {
+            let point_1_angle = current_point.angle_of_3(
+                &Point2d::new(current_point.x(), current_point.y() + 1),
+                pt_1,
+            );
+            let point_2_angle = current_point.angle_of_3(
+                &Point2d::new(current_point.x(), current_point.y() + 1),
+                pt_2,
+            );
+            point_1_angle
+                .partial_cmp(&point_2_angle)
+                .unwrap_or(Ordering::Equal)
+        });
+
+        let mut its = true;
+        let mut i = 0;
+        while its == true && i < k_nearest_points_iter.len() {
+            i += 1;
+
+            let last_point = if k_nearest_points_iter[i] == first_point {
+                1
+            } else {
+                0
+            };
+
+            let j = 2;
+            its = false;
+
+            while its == false && j < hull.len() - last_point {}
+        }
     }
+}
+
+pub fn segment_intersects(
+    data: &[Point2d],
+    segment_1: (usize, usize),
+    segment_2: (usize, usize),
+) -> bool {
+    let segment_1_start = match data.get(segment_1.0) {
+        Some(pt) => pt,
+        None => {
+            return false;
+        }
+    };
+
+    let segment_1_end = match data.get(segment_1.1) {
+        Some(pt) => pt,
+        None => {
+            return false;
+        }
+    };
+
+    let segment_2_start = match data.get(segment_2.0) {
+        Some(pt) => pt,
+        None => {
+            return false;
+        }
+    };
+
+    let segment_2_end = match data.get(segment_2.1) {
+        Some(pt) => pt,
+        None => {
+            return false;
+        }
+    };
 }

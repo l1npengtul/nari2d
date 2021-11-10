@@ -135,3 +135,20 @@ impl PointDistance for IndexedPoint2d {
         f32::pow((self.x() - point[0]), 2) + f32::pow((self.y() - point[1]), 2)
     }
 }
+
+#[inline]
+fn nearly_equal_f32(n: f32, m: f32) -> bool {
+    let epsilon = (2_f32 * f32::abs(n - m)) / (n.abs() + m.abs());
+
+    if n == m || f32::abs(n - m) <= epsilon {
+        return true;
+    }
+    false
+}
+
+#[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
+pub enum Orientation {
+    Colinear,
+    ClockWise,
+    CounterClockWise,
+}
