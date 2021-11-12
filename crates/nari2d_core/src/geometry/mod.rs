@@ -76,7 +76,10 @@ impl Iterator for PointVec {
         };
         let next = match self.int.get(self.idx + 1) {
             Some(pt) => *pt,
-            None => current,
+            None => match self.int.get(0) {
+                Some(pt) => *pt,
+                None => return None,
+            },
         };
 
         self.idx += 1;
@@ -95,6 +98,54 @@ impl Deref for PointVec {
 impl DerefMut for PointVec {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.int
+    }
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+pub struct PointSlice<'a> {
+    data: &'a [Point2d],
+    index: usize,
+}
+
+impl<'a> From<&[Point2d]> for PointSlice<'a> {
+    fn from(data: &[Point2d]) -> Self {
+        PointSlice { data, index: 0 }
+    }
+}
+
+impl<'a> Deref for PointSlice<'a> {
+    type Target = &'a [Point2d];
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
+
+impl<'a> DerefMut for PointSlice<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.data
+    }
+}
+
+impl<'a> Iterator for PointSlice<'a> {
+    type Item = [&'a Point2d; 2];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let current = match self.data.get(self.index) {
+            None => return None,
+            Some(pt) => pt,
+        };
+
+        let next = match self.data.get(self.index + 1) {
+            None => match self.data.get(0) {
+                Some(pt) => pt,
+                None => return None,
+            },
+            Some(pt) => pt,
+        };
+
+        self.index += 1;
+        Some([current, next])
     }
 }
 
@@ -151,4 +202,32 @@ pub enum Orientation {
     Colinear = 0,
     ClockWise = 1,
     CounterClockWise = 2,
+}
+
+// Marker type to tell the user that this was the result of a precalculation
+pub type PreCalcMultiples = Vec<f32>;
+pub type PreCalcConsts = Vec<f32>;
+pub type PreCalcMultiplesSlice<'a> = &'a [f32];
+pub type PreCalcConstsSlice<'a> = &'a [f32];
+
+// from http://alienryderflex.com/polygon/
+#[inline]
+#[must_use]
+pub fn pre_calculate_polygon_values(polygon: &[Point2d]) -> (PreCalcMultiples, PreCalcConsts) {
+    let mut const_precalc = vec![0_f32; polygon.len()];
+    let mut multi_precalc = vec![0_f32; polygon.len()];
+    for (idx, poly_points) in PointSlice::from(polygon).enumerate() {
+        let i = poly_points[1];
+        let j = poly_points[0];
+
+        if i.y() == j.y() {
+            const_precalc[idx] = i.x();
+            multi_precalc[idx] = 0_f32;
+        } else {
+            const_precalc[idx] =
+                i.x() - (i.y() * j.x()) / (j.y() - i.y()) + (i.y() * i.x()) / (j.y() - i.y());
+            multi_precalc[idx] = (j.x() - i.x()) / (j.y() - i.y());
+        }
+    }
+    (multi_precalc, const_precalc)
 }

@@ -1,4 +1,7 @@
-use crate::geometry::{nearly_equal_f32, Angle, IndexedPoint2d, Orientation, Scale2d};
+use crate::geometry::{
+    nearly_equal_f32, Angle, IndexedPoint2d, Orientation, PointSlice, PointVec, PreCalcConsts,
+    PreCalcConstsSlice, PreCalcMultiplesSlice, Scale2d,
+};
 use bevy_ecs::query::Or;
 use robust::{orient2d, Coord};
 use rstar::{Envelope, Point, PointDistance, RTreeObject, AABB};
@@ -318,10 +321,46 @@ impl Point2d {
         false
     }
 
+    // from http://alienryderflex.com/polygon/
     #[inline]
     #[must_use]
-    // from https://www.eecs.umich.edu/courses/eecs380/HANDOUTS/PROJ2/InsidePoly.html
-    pub fn point_in_polygon(&self, polygon: &[Point2d]) -> bool {}
+    pub fn point_in_polygon(&self, polygon: &[Point2d]) -> bool {
+        let mut odd_nodes = false;
+        for poly_points in PointSlice::from(polygon) {
+            if (poly_points[1].y < self.y && poly_points[0].y >= self.y
+                || poly_points[0].y < self.y && poly_points[1].y >= self.y)
+                && (poly_points[1].x <= self.x || poly_points[0].y <= self.x)
+            {
+                odd_nodes ^= (poly_points[1].x
+                    + (self.y - poly_points[1].y) / (poly_points[0].y - poly_points[1].y)
+                        * (poly_points[0].x - poly_points[1].x)
+                    < self.x)
+            }
+        }
+        odd_nodes
+    }
+
+    // from http://alienryderflex.com/polygon/
+    #[inline]
+    #[must_use]
+    pub fn point_in_polygon_with_precalc(
+        &self,
+        polygon: &[Point2d],
+        constants: PreCalcConstsSlice<'_>,
+        multiples: PreCalcMultiplesSlice<'_>,
+    ) -> bool {
+        let mut odd_nodes = false;
+
+        for (idx, poly_points) in PointSlice::new(polygon).enumerate() {
+            if (poly_points[1].y < self.y && poly_points[0].y >= self.y)
+                || (poly_points[0].y < self.y && poly_points[1].y >= self.y)
+            {
+                odd_nodes ^= (self.y * multiples[idx] + constants[idx] < self.x);
+            }
+        }
+
+        odd_nodes
+    }
 }
 
 impl Add for Point2d {

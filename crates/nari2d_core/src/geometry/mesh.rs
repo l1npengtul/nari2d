@@ -333,30 +333,43 @@ pub fn concave_hull(
     }
 
     let mut all_inside = true;
-    i = rtree.size();
-    while all_inside == true && i > 0 {}
+    for point in rtree.iter() {
+        if !(point.point_in_polygon(&hull.into())) {
+            all_inside = false;
+            break;
+        }
+    }
+    if all_inside == false {
+        return concave_hull(points.into(), point_include + 1);
+    }
+
+    return Ok((hull.into(), points.into()));
 }
 
 pub fn segment_intersects(segment_1: [Point2d; 2], segment_2: [Point2d; 2]) -> bool {
-    let ori_1 = Point2d::orientation(segment_1[0], segment_1[1], segment_2[0]);
-    let ori_2 = Point2d::orientation(segment_1[0], segment_1[1], segment_2[1]);
-    let ori_3 = Point2d::orientation(segment_2[0], segment_2[1], segment_1[0]);
-    let ori_4 = Point2d::orientation(segment_2[0], segment_2[1], segment_1[1]);
+    let ori_1 = Point2d::orientation(&segment_1[0], &segment_1[1], &segment_2[0]);
+    let ori_2 = Point2d::orientation(&segment_1[0], &segment_1[1], &segment_2[1]);
+    let ori_3 = Point2d::orientation(&segment_2[0], &segment_2[1], &segment_1[0]);
+    let ori_4 = Point2d::orientation(&segment_2[0], &segment_2[1], &segment_1[1]);
 
     if ori_1 != ori_2 && ori_3 != ori_4 {
         return true;
     }
 
-    if ori_3 == Orientation::Colinear && segment_1[0].point_on_segment(segment_2[0], segment_2[1]) {
+    if ori_3 == Orientation::Colinear && segment_1[0].point_on_segment(&segment_2[0], &segment_2[1])
+    {
         return true;
     }
-    if ori_4 == Orientation::Colinear && segment_1[1].point_on_segment(segment_2[0], segment_2[1]) {
+    if ori_4 == Orientation::Colinear && segment_1[1].point_on_segment(&segment_2[0], &segment_2[1])
+    {
         return true;
     }
-    if ori_1 == Orientation::Colinear && segment_2[0].point_on_segment(segment_1[0], segment_1[1]) {
+    if ori_1 == Orientation::Colinear && segment_2[0].point_on_segment(&segment_1[0], &segment_1[1])
+    {
         return true;
     }
-    if ori_2 == Orientation::Colinear && segment_2[1].point_on_segment(segment_1[0], segment_1[1]) {
+    if ori_2 == Orientation::Colinear && segment_2[1].point_on_segment(&segment_1[0], &segment_1[1])
+    {
         return true;
     }
 
