@@ -1,22 +1,16 @@
 // Modified from delaunator crate to support f32 types.
 
-use crate::geometry::{angles_of_triangle, Angle, IndexedPoint2d, Orientation};
 use crate::{
     error::{NResult, Nari2DError},
-    geometry::Point2d,
+    geometry::{angles_of_triangle, Angle, IndexedPoint2d, Orientation, Point2d},
 };
 use cdt::Error;
 use delaunator::{triangulate, Point};
 use rstar::RTree;
-use std::cmp::Ordering;
-use std::ops::{Index, IndexMut};
-
-pub struct EditableTriangleMesh {
-    points: Vec<Point2d>,
-    triangles: Vec<(usize, usize, usize)>,
-    neighbours: Vec<(usize, usize, usize)>,
-    constraints: Vec<usize>,
-}
+use std::{
+    cmp::Ordering,
+    ops::{Index, IndexMut},
+};
 
 pub struct VertexTriangleMesh {
     points: Vec<Point2d>,
@@ -25,7 +19,17 @@ pub struct VertexTriangleMesh {
 }
 
 impl VertexTriangleMesh {
-    pub fn new(points: Vec<Point2d>, edges: Vec<usize>) -> NResult<Self> {
+    pub fn new(points: Vec<Point2d>) -> NResult<Self> {
+        let mut points = points;
+        let concave = match concave_hull(&mut points, 3) {
+            Ok(hull) => hull,
+            Err(why) => return Err(why),
+        };
+
+        Self::with_calculated_edges(points, concave)
+    }
+
+    pub fn with_calculated_edges(points: Vec<Point2d>, edges: Vec<usize>) -> NResult<Self> {
         // pre clean points
         // dedup via relative epsilon
         let points_len_before = points.len();
@@ -106,14 +110,41 @@ impl VertexTriangleMesh {
         Ok(())
     }
 
+    pub fn refine_points(
+        &mut self,
+        min_angle: Option<Angle>,
+        max_iter: Option<usize>,
+    ) -> NResult<()> {
+    }
+
+    pub fn get(&self, index: usize) -> Option<&Point2d> {
+        self.points.get(index)
+    }
+
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut Point2d> {
+        self.points.get_mut(index)
+    }
+
+    pub unsafe fn get_unchecked(&self, index: usize) -> &Point2d {
+        self.points.get_unchecked(index)
+    }
+
+    pub unsafe fn get_unchecked_mut(&mut self, index: usize) -> &mut Point2d {
+        self.points.get_unchecked_mut(index)
+    }
+
     pub fn modify_point(&mut self, index: usize, new_point: Point2d) -> Option<Point2d> {
         match self.points.get_mut(index) {
-            Some(_) => {
-                let temp = self.points[index];
-                self.points[index] = new_point;
-                Some(temp)
+            Some(point) => {
+                let old_point = *point;
+                point.set_y(new_point.y());
+                point.set_x(new_point.x());
+                Some(old_point)
             }
-            None => None,
+            None => {
+                self.points.insert(index, new_point);
+                None
+            }
         }
     }
 }
@@ -227,14 +258,11 @@ impl<'a> IntoIterator for TriangleMeshViewer<'a> {
 }
 
 // algorithm from https://www.researchgate.net/publication/220868874_Concave_hull_A_k-nearest_neighbours_approach_for_the_computation_of_the_region_occupied_by_a_set_of_points
-pub fn concave_hull(
-    points: Vec<Point2d>,
-    point_include: usize,
-) -> NResult<(Vec<usize>, Vec<Point2d>)> {
+pub fn concave_hull(points: &mut [Point2d], point_include: usize) -> NResult<Vec<usize>> {
     let mut point_include = usize::max(point_include, 3_usize);
     if points.len() > 3 {
         return Err(Nari2DError::MeshConcaveCalculation {
-            points,
+            points: points.to_vec(),
             error: "Points < 3".to_string(),
         });
     }
@@ -248,7 +276,10 @@ pub fn concave_hull(
     let mut points = points
         .into_iter()
         .enumerate()
-        .map(|(index, point)| IndexedPoint2d { index, point })
+        .map(|(index, point)| IndexedPoint2d {
+            index,
+            point: *point,
+        })
         .collect::<Vec<IndexedPoint2d>>();
 
     let mut rtree = RTree::bulk_load(points.clone());
@@ -343,7 +374,7 @@ pub fn concave_hull(
         return concave_hull(points.into(), point_include + 1);
     }
 
-    return Ok((hull.into(), points.into()));
+    return Ok(hull.into());
 }
 
 pub fn segment_intersects(segment_1: [Point2d; 2], segment_2: [Point2d; 2]) -> bool {

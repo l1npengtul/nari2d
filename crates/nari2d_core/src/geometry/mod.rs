@@ -7,6 +7,8 @@ pub use scale2d::Scale2d;
 
 mod angle;
 mod bounds;
+mod half_edge;
+mod lattice;
 mod mesh;
 mod point2d;
 mod scale2d;

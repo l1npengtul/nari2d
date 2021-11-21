@@ -1,6 +1,6 @@
 #![deny(clippy::pedantic)]
 #![warn(clippy::all)]
-#![feature(stdsimd)]
+#![feature(portable_simd)]
 
 #[cfg(feature = "serde_serialize")]
 #[macro_use]

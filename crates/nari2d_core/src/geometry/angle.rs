@@ -5,7 +5,7 @@ use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Rem, RemAssign, S
 const TWO_PI: f32 = core::f32::consts::PI * 2_f32;
 const PI: f32 = core::f32::consts::PI;
 
-#[derive(Copy, Clone, Default, Debug, PartialOrd, PartialEq)]
+#[derive(Copy, Clone, Default, Debug, PartialOrd, PartialEq, Serialize, Deserialize)]
 #[repr(C)]
 pub struct Angle {
     radians: f32,

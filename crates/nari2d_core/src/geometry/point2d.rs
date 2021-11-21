@@ -1,3 +1,4 @@
+use crate::geometry::lattice::StrengthPoint;
 use crate::geometry::{
     nearly_equal_f32, Angle, IndexedPoint2d, Orientation, PointSlice, PointVec, PreCalcConsts,
     PreCalcConstsSlice, PreCalcMultiplesSlice, Scale2d,
@@ -12,7 +13,7 @@ use std::{
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Rem, RemAssign, Sub, SubAssign},
 };
 
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Default, Debug, Serialize, Deserialize)]
 #[repr(C)]
 pub struct Point2d {
     x: f32,
@@ -733,5 +734,11 @@ impl Into<Coord<f32>> for &Point2d {
             x: self.x,
             y: self.y,
         }
+    }
+}
+
+impl From<StrengthPoint> for Point2d {
+    fn from(s_pt: StrengthPoint) -> Self {
+        s_pt.point
     }
 }
