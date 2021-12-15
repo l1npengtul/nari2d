@@ -6,8 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["serde_serialize"]
-serde_serialize = ["serde", "spade/serde_serialize", "serde_derive", "nalgebra/serde-serialize"]
+default = ["serde_impl"]
+serde_impl = ["serde", "spade/serde_serialize", "serde_derive", "nalgebra/serde-serialize"]
 
 [dependencies]
 thiserror = "^1.0"

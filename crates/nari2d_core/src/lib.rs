@@ -2,7 +2,7 @@
 #![warn(clippy::all)]
 #![feature(portable_simd)]
 
-#[cfg(feature = "serde_serialize")]
+#[cfg(feature = "serde_impl")]
 #[macro_use]
 extern crate serde;
 

@@ -1,11 +1,11 @@
-use crate::geometry::lattice::StrengthPoint;
-use crate::geometry::{
-    nearly_equal_f32, Angle, IndexedPoint2d, Orientation, PointSlice, PointVec, PreCalcConsts,
-    PreCalcConstsSlice, PreCalcMultiplesSlice, Scale2d,
+use crate::{
+    geometry::lattice::StrengthPoint,
+    geometry::{
+        nearly_equal_f32, Angle, IndexedPoint2d, Orientation, PointSlice, PointVec, PreCalcConsts,
+        PreCalcConstsSlice, PreCalcMultiplesSlice, Scale2d,
+    },
 };
-use bevy_ecs::query::Or;
 use robust::{orient2d, Coord};
-use rstar::{Envelope, Point, PointDistance, RTreeObject, AABB};
 use std::{
     cmp::Ordering,
     fmt::{Display, Formatter},
@@ -13,7 +13,8 @@ use std::{
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Rem, RemAssign, Sub, SubAssign},
 };
 
-#[derive(Copy, Clone, Default, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
+#[derive(Copy, Clone, Default, Debug)]
 #[repr(C)]
 pub struct Point2d {
     x: f32,
@@ -739,6 +740,6 @@ impl Into<Coord<f32>> for &Point2d {
 
 impl From<StrengthPoint> for Point2d {
     fn from(s_pt: StrengthPoint) -> Self {
-        s_pt.point
+        s_pt.point()
     }
 }

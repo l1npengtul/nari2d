@@ -12,6 +12,8 @@ use std::{
     ops::{Index, IndexMut},
 };
 
+#[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
+#[derive(Clone, Debug, Default, Hash, PartialOrd, PartialEq)]
 pub struct VertexTriangleMesh {
     points: Vec<Point2d>,
     triangles: Vec<(usize, usize, usize)>,

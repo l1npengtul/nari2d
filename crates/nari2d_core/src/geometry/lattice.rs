@@ -1,11 +1,9 @@
-use crate::error::NResult;
-use crate::geometry::Point2d;
+use crate::{error::NResult, geometry::Point2d};
 use smallvec::SmallVec;
 use std::ops::{Deref, DerefMut, Index};
 
-#[derive(
-    Copy, Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize,
-)]
+#[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
+#[derive(Copy, Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct StrengthPoint {
     point: Point2d,
     strength: f32,
@@ -17,6 +15,10 @@ impl StrengthPoint {
             point: point.into(),
             strength,
         }
+    }
+
+    pub fn point(&self) -> Point2d {
+        self.point
     }
 
     pub fn strength(&self) -> f32 {

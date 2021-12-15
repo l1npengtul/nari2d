@@ -1,8 +1,11 @@
 use crate::geometry::Point2d;
-use std::fmt::{Display, Formatter};
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
+use std::{
+    fmt::{Display, Formatter},
+    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign},
+};
 
-#[derive(Copy, Clone, Default, Debug, PartialOrd, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
+#[derive(Copy, Clone, Default, Debug, PartialOrd, PartialEq)]
 pub struct Scale2d {
     x: f32,
     y: f32,

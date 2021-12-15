@@ -1,11 +1,14 @@
 use crate::geometry::Point2d;
-use std::fmt::{Display, Formatter};
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Rem, RemAssign, Sub, SubAssign};
+use std::{
+    fmt::{Display, Formatter},
+    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Rem, RemAssign, Sub, SubAssign},
+};
 
 const TWO_PI: f32 = core::f32::consts::PI * 2_f32;
 const PI: f32 = core::f32::consts::PI;
 
-#[derive(Copy, Clone, Default, Debug, PartialOrd, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
+#[derive(Copy, Clone, Default, Debug, PartialOrd, PartialEq)]
 #[repr(C)]
 pub struct Angle {
     radians: f32,

@@ -8,7 +8,8 @@ use crate::geometry::{Point2d, Scale2d};
 // C = center
 // B = extend
 
-#[derive(Copy, Clone, Debug, Default, PartialOrd, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
+#[derive(Copy, Clone, Debug, Default, PartialOrd, PartialEq)]
 #[repr(C)]
 pub struct Bounds {
     center: Point2d,

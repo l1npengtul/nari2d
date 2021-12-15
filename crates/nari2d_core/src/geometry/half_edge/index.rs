@@ -1,15 +1,15 @@
 use std::{
+    collections::BTreeMap,
     fmt::Debug,
     hash::Hash,
     ops::{Deref, DerefMut},
 };
 
-pub(crate) trait HEIndex:
-    Copy + Clone + Debug + Default + Deref + Hash + Eq + Ord + Send + Sync
-{
+pub trait HEIndex: Copy + Clone + Debug + Default + Deref + Hash + Eq + Ord + Send + Sync {
     fn new(idx: u32) -> Self;
 }
 
+#[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct VertexIndex {
     idx: u32,
@@ -29,6 +29,7 @@ impl HEIndex for VertexIndex {
     }
 }
 
+#[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct HalfEdgeIndex {
     idx: u32,
@@ -48,6 +49,7 @@ impl HEIndex for HalfEdgeIndex {
     }
 }
 
+#[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct FaceIndex {
     idx: u32,
@@ -63,8 +65,6 @@ impl Deref for FaceIndex {
 
 impl HEIndex for FaceIndex {
     fn new(idx: u32) -> Self {
-        FaceIndex {
-            idx
-        }
+        FaceIndex { idx }
     }
 }
