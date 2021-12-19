@@ -1,9 +1,6 @@
-use crate::{
-    geometry::lattice::StrengthPoint,
-    geometry::{
-        nearly_equal_f32, Angle, IndexedPoint2d, Orientation, PointSlice, PointVec, PreCalcConsts,
-        PreCalcConstsSlice, PreCalcMultiplesSlice, Scale2d,
-    },
+use crate::geometry::{
+    lattice::StrengthPoint, nearly_equal_f32, Angle, IndexedPoint2d, Orientation, PointSlice,
+    PointVec, PreCalcConsts, PreCalcConstsSlice, PreCalcMultiplesSlice, Scale2d,
 };
 use robust::{orient2d, Coord};
 use std::{
@@ -674,6 +671,16 @@ impl Eq for Point2d {}
 
 // See f32::total_cmp().
 pub(crate) fn float_cmp(left: &f32, right: &f32) -> Ordering {
+    if left.is_nan() && right.is_nan() {
+        return Ordering::Equal;
+    } else if left.is_infinite() && right.is_infinite() {
+        return Ordering::Equal;
+    } else if left.is_nan() && !right.is_nan() {
+        return Ordering::Less;
+    } else if !left.is_nan() && right.is_nan() {
+        return Ordering::Greater;
+    }
+
     let mut left = left.to_bits() as i32;
     let mut right = right.to_bits() as i32;
 
@@ -699,24 +706,6 @@ impl PartialOrd for Point2d {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
-    }
-}
-
-impl RTreeObject for Point2d {
-    type Envelope = AABB<[f32; 2]>;
-
-    #[inline]
-    fn envelope(&self) -> Self::Envelope {
-        AABB::from_point([self.x, self.y])
-    }
-}
-
-impl PointDistance for Point2d {
-    fn distance_2(
-        &self,
-        point: &<Self::Envelope as Envelope>::Point,
-    ) -> <<Self::Envelope as Envelope>::Point as Point>::Scalar {
-        f32::pow((self.x() - point[0]), 2) + f32::pow((self.y() - point[1]), 2)
     }
 }
 
