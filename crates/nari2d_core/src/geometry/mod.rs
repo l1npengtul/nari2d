@@ -1,10 +1,13 @@
+use nari2d_mesh::{mesh::Mesh, MeshBuilder};
 use rstar::{Envelope, Point, PointDistance, RTreeObject, AABB};
+use std::fs::read_to_string;
 use std::ops::{Deref, DerefMut};
+use std::path::Iter;
 
 pub use angle::Angle;
 pub use point2d::Point2d;
 pub use scale2d::Scale2d;
-pub use
+use test::RunIgnored::No;
 
 mod angle;
 mod bounds;
@@ -12,7 +15,9 @@ mod lattice;
 mod mesh;
 mod point2d;
 mod scale2d;
-mod half_edge;
+
+pub type TMesh = Mesh<Point2d>;
+pub type TMeshBuilder = MeshBuilder<f32>;
 
 /// ```.ignore
 ///       C
@@ -46,110 +51,6 @@ pub fn is_triangle_bad(threshold: Angle, p1_a: Point2d, p2_b: Point2d, p3_c: Poi
         return true;
     }
     false
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct PointVec {
-    int: Vec<Point2d>,
-    idx: usize,
-}
-
-impl PointVec {
-    pub fn new() -> Self {
-        PointVec {
-            int: vec![],
-            idx: 0,
-        }
-    }
-}
-
-impl From<Vec<Point2d>> for PointVec {
-    fn from(from: Vec<Point2d>) -> Self {
-        PointVec { int: from, idx: 0 }
-    }
-}
-
-impl Iterator for PointVec {
-    type Item = (Point2d, Point2d);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let current = match self.int.get(self.idx) {
-            Some(pt) => *pt,
-            None => return None,
-        };
-        let next = match self.int.get(self.idx + 1) {
-            Some(pt) => *pt,
-            None => match self.int.get(0) {
-                Some(pt) => *pt,
-                None => return None,
-            },
-        };
-
-        self.idx += 1;
-        Some((current, next))
-    }
-}
-
-impl Deref for PointVec {
-    type Target = Vec<Point2d>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.int
-    }
-}
-
-impl DerefMut for PointVec {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.int
-    }
-}
-
-#[derive(Copy, Clone, Debug, Default)]
-pub struct PointSlice<'a> {
-    data: &'a [Point2d],
-    index: usize,
-}
-
-impl<'a> From<&[Point2d]> for PointSlice<'a> {
-    fn from(data: &[Point2d]) -> Self {
-        PointSlice { data, index: 0 }
-    }
-}
-
-impl<'a> Deref for PointSlice<'a> {
-    type Target = &'a [Point2d];
-
-    fn deref(&self) -> &Self::Target {
-        &self.data
-    }
-}
-
-impl<'a> DerefMut for PointSlice<'a> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.data
-    }
-}
-
-impl<'a> Iterator for PointSlice<'a> {
-    type Item = [&'a Point2d; 2];
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let current = match self.data.get(self.index) {
-            None => return None,
-            Some(pt) => pt,
-        };
-
-        let next = match self.data.get(self.index + 1) {
-            None => match self.data.get(0) {
-                Some(pt) => pt,
-                None => return None,
-            },
-            Some(pt) => pt,
-        };
-
-        self.index += 1;
-        Some([current, next])
-    }
 }
 
 #[derive(Copy, Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]

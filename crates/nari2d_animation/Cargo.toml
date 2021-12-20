@@ -1,5 +1,5 @@
 [package]
-name = "nari2d-file"
+name = "nari2d_animation"
 version = "0.1.0"
 edition = "2021"
 

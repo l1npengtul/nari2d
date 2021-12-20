@@ -12,3 +12,4 @@ pub mod error;
 pub mod geometry;
 mod macros;
 pub mod traits;
+pub mod collections;

@@ -42,8 +42,8 @@ optional = true
 version = "^1.7"
 features = ["serde", "union", "const_generics", "const_new"]
 
-[dependencies.nari2d-mesh]
-path = "../nari2d-mesh"
+[dependencies.nari2d_mesh]
+path = "../nari2d_mesh"
 
 [dependencies.nari2d_traits]
 path = "../nari2d_traits"

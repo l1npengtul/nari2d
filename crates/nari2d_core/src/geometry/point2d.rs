@@ -2,6 +2,7 @@ use crate::geometry::{
     lattice::StrengthPoint, nearly_equal_f32, Angle, IndexedPoint2d, Orientation, PointSlice,
     PointVec, PreCalcConsts, PreCalcConstsSlice, PreCalcMultiplesSlice, Scale2d,
 };
+use nari2d_mesh::point::TwoDimensionalPoint;
 use robust::{orient2d, Coord};
 use std::{
     cmp::Ordering,
@@ -730,5 +731,29 @@ impl Into<Coord<f32>> for &Point2d {
 impl From<StrengthPoint> for Point2d {
     fn from(s_pt: StrengthPoint) -> Self {
         s_pt.point()
+    }
+}
+
+impl TwoDimensionalPoint for Point2d {
+    type SCALAR = f32;
+
+    fn new_point(x: Self::SCALAR, y: Self::SCALAR) -> Self {
+        Point2d::new(x, y)
+    }
+
+    fn x(&self) -> Self::SCALAR {
+        self.x
+    }
+
+    fn set_x(&mut self, new_x: Self::SCALAR) {
+        self.x = new_x;
+    }
+
+    fn y(&self) -> Self::SCALAR {
+        self.y
+    }
+
+    fn set_y(&mut self, new_y: Self::SCALAR) {
+        self.y = new_y
     }
 }
