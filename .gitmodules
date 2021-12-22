@@ -1,3 +1,0 @@
-[submodule "crates/nari2d_mesh"]
-	path = crates/nari2d_mesh
-	url = git@github.com:l1npengtul/nari2d_mesh.git
