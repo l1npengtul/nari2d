@@ -1,0 +1,363 @@
+//! See [Mesh](crate::mesh::Mesh).
+
+use crate::mesh::ids::*;
+use crate::mesh::math::*;
+use crate::mesh::*;
+use std::collections::{HashMap, HashSet};
+
+/// # Merge
+impl<P: TwoDimensionalPoint> Mesh<P> {
+    ///
+    /// Merges the mesh together with the `other` mesh.
+    /// The `other` mesh primitives are copied to the current mesh (and `other` is therefore not changed)
+    /// followed by merging of overlapping primitives.
+    ///
+    /// # Error
+    ///
+    /// Returns an error if the merging will result in a non-manifold mesh.
+    ///
+    pub fn merge_with(&mut self, other: &Self) -> Result<(), Error> {
+        self.append(other);
+        self.merge_overlapping_primitives()?;
+        Ok(())
+    }
+
+    /// Appends the `other` mesh to this mesh without creating a connection between them.
+    /// Use `merge_with` if merging of overlapping primitives is desired, thereby creating a connection.
+    /// All the primitives of the `other` mesh are copied to the current mesh and the `other` mesh is therefore not changed.
+    pub fn append(&mut self, other: &Self) {
+        let mut mapping: HashMap<VertexID, VertexID> = HashMap::new();
+        let mut get_or_create_vertex = |mesh: &mut Mesh<P>, vertex_id| -> VertexID {
+            if let Some(vid) = mapping.get(&vertex_id) {
+                return *vid;
+            }
+            let p = other.vertex_position(vertex_id);
+            let vid = mesh.create_vertex(p.clone());
+            mapping.insert(vertex_id, vid);
+            vid
+        };
+
+        let mut face_mapping: HashMap<FaceID, FaceID> = HashMap::new();
+        for other_face_id in other.face_iter() {
+            let vertex_ids = other.face_vertices(other_face_id);
+
+            let vertex_id0 = get_or_create_vertex(self, vertex_ids.0);
+            let vertex_id1 = get_or_create_vertex(self, vertex_ids.1);
+            let vertex_id2 = get_or_create_vertex(self, vertex_ids.2);
+            let new_face_id = self
+                .connectivity_info
+                .create_face(vertex_id0, vertex_id1, vertex_id2);
+
+            for halfedge_id in other.face_halfedge_iter(other_face_id) {
+                if let Some(fid) = other.walker_from_halfedge(halfedge_id).as_twin().face_id() {
+                    if let Some(self_face_id) = face_mapping.get(&fid) {
+                        for halfedge_id1 in self.face_halfedge_iter(*self_face_id) {
+                            let mut walker1 = self.walker_from_halfedge(halfedge_id1);
+                            let source_vertex_id = walker1.vertex_id().unwrap();
+                            let sink_vertex_id = walker1.as_next().vertex_id().unwrap();
+
+                            for halfedge_id2 in self.face_halfedge_iter(new_face_id) {
+                                let mut walker2 = self.walker_from_halfedge(halfedge_id2);
+                                if sink_vertex_id == walker2.vertex_id().unwrap()
+                                    && source_vertex_id == walker2.as_next().vertex_id().unwrap()
+                                {
+                                    self.connectivity_info.set_halfedge_twin(
+                                        walker1.halfedge_id().unwrap(),
+                                        walker2.halfedge_id().unwrap(),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            face_mapping.insert(other_face_id, new_face_id);
+        }
+
+        self.create_boundary_edges();
+    }
+
+    ///
+    /// Merges overlapping faces, edges and vertices.
+    ///
+    /// # Error
+    ///
+    /// Returns an error if the merging will result in a non-manifold mesh.
+    ///
+    pub fn merge_overlapping_primitives(&mut self) -> Result<(), Error> {
+        let set_of_vertices_to_merge = self.find_overlapping_vertices();
+        let set_of_edges_to_merge = self.find_overlapping_edges(&set_of_vertices_to_merge);
+        let set_of_faces_to_merge = self.find_overlapping_faces(&set_of_vertices_to_merge);
+
+        for faces_to_merge in set_of_faces_to_merge {
+            let mut iter = faces_to_merge.iter();
+            iter.next();
+            for face_id2 in iter {
+                self.remove_face_unsafe(*face_id2);
+            }
+        }
+
+        for vertices_to_merge in set_of_vertices_to_merge {
+            let mut iter = vertices_to_merge.iter();
+            let mut vertex_id1 = *iter.next().unwrap();
+            for vertex_id2 in iter {
+                vertex_id1 = self.merge_vertices(vertex_id1, *vertex_id2)?;
+            }
+        }
+
+        for edges_to_merge in set_of_edges_to_merge {
+            let mut iter = edges_to_merge.iter();
+            let mut edge_id1 = *iter.next().unwrap();
+            for edge_id2 in iter {
+                edge_id1 = self.merge_halfedges(edge_id1, *edge_id2)?;
+            }
+        }
+
+        self.fix_orientation();
+
+        Ok(())
+    }
+
+    fn merge_halfedges(
+        &mut self,
+        halfedge_id1: HalfEdgeID,
+        halfedge_id2: HalfEdgeID,
+    ) -> Result<HalfEdgeID, Error> {
+        let mut walker1 = self.walker_from_halfedge(halfedge_id1);
+        let mut walker2 = self.walker_from_halfedge(halfedge_id2);
+
+        let edge1_alone = walker1.face_id().is_none() && walker1.as_twin().face_id().is_none();
+        let edge1_interior = walker1.face_id().is_some() && walker1.as_twin().face_id().is_some();
+        let edge1_boundary = !edge1_alone && !edge1_interior;
+
+        let edge2_alone = walker2.face_id().is_none() && walker2.as_twin().face_id().is_none();
+        let edge2_interior = walker2.face_id().is_some() && walker2.as_twin().face_id().is_some();
+        let edge2_boundary = !edge2_alone && !edge2_interior;
+
+        if edge1_interior && !edge2_alone || edge2_interior && !edge1_alone {
+            return Err(Error::ActionWillResultInNonManifoldMesh {
+                message: format!(
+                    "Merging halfedges {} and {} will create a non-manifold mesh",
+                    halfedge_id1, halfedge_id2
+                ),
+            });
+        }
+
+        let mut halfedge_to_remove1 = None;
+        let mut halfedge_to_remove2 = None;
+        let mut halfedge_to_survive1 = None;
+        let mut halfedge_to_survive2 = None;
+        let mut vertex_id1 = None;
+        let mut vertex_id2 = None;
+
+        if edge1_boundary {
+            if walker1.face_id().is_none() {
+                walker1.as_twin();
+            };
+            halfedge_to_remove1 = walker1.twin_id();
+            halfedge_to_survive1 = walker1.halfedge_id();
+            vertex_id1 = walker1.vertex_id();
+        }
+        if edge2_boundary {
+            if walker2.face_id().is_none() {
+                walker2.as_twin();
+            };
+            halfedge_to_remove2 = walker2.twin_id();
+            halfedge_to_survive2 = walker2.halfedge_id();
+            vertex_id2 = walker2.vertex_id();
+        }
+        if edge1_alone {
+            if edge2_interior {
+                halfedge_to_remove1 = walker1.twin_id();
+                halfedge_to_remove2 = walker1.halfedge_id();
+
+                halfedge_to_survive1 = walker2.halfedge_id();
+                vertex_id1 = walker2.vertex_id();
+                walker2.as_twin();
+                halfedge_to_survive2 = walker2.halfedge_id();
+                vertex_id2 = walker2.vertex_id();
+            } else {
+                if vertex_id2 == walker1.vertex_id() {
+                    walker1.as_twin();
+                }
+                halfedge_to_remove1 = walker1.twin_id();
+                halfedge_to_survive1 = walker1.halfedge_id();
+                vertex_id1 = walker1.vertex_id();
+            }
+        }
+        if edge2_alone {
+            if edge1_interior {
+                halfedge_to_remove1 = walker2.twin_id();
+                halfedge_to_remove2 = walker2.halfedge_id();
+
+                halfedge_to_survive1 = walker1.halfedge_id();
+                vertex_id1 = walker1.vertex_id();
+                walker1.as_twin();
+                halfedge_to_survive2 = walker1.halfedge_id();
+                vertex_id2 = walker1.vertex_id();
+            } else {
+                if vertex_id1 == walker2.vertex_id() {
+                    walker2.as_twin();
+                }
+                halfedge_to_remove2 = walker2.twin_id();
+                halfedge_to_survive2 = walker2.halfedge_id();
+                vertex_id2 = walker2.vertex_id();
+            }
+        }
+
+        self.connectivity_info
+            .remove_halfedge(halfedge_to_remove1.unwrap());
+        self.connectivity_info
+            .remove_halfedge(halfedge_to_remove2.unwrap());
+        self.connectivity_info
+            .set_halfedge_twin(halfedge_to_survive1.unwrap(), halfedge_to_survive2.unwrap());
+        self.connectivity_info
+            .set_vertex_halfedge(vertex_id1.unwrap(), halfedge_to_survive2);
+        self.connectivity_info
+            .set_vertex_halfedge(vertex_id2.unwrap(), halfedge_to_survive1);
+        Ok(halfedge_to_survive1.unwrap())
+    }
+
+    fn merge_vertices(
+        &mut self,
+        vertex_id1: VertexID,
+        vertex_id2: VertexID,
+    ) -> Result<VertexID, Error> {
+        for halfedge_id in self.halfedge_iter() {
+            let walker = self.walker_from_halfedge(halfedge_id);
+            if walker.vertex_id().unwrap() == vertex_id2 {
+                self.connectivity_info
+                    .set_halfedge_vertex(walker.halfedge_id().unwrap(), vertex_id1);
+            }
+        }
+        self.connectivity_info.remove_vertex(vertex_id2);
+
+        Ok(vertex_id1)
+    }
+
+    fn find_overlapping_vertices(&self) -> Vec<Vec<VertexID>> {
+        let mut to_check = HashSet::new();
+        self.vertex_iter().for_each(|v| {
+            to_check.insert(v);
+        });
+
+        let mut set_to_merge = Vec::new();
+        while !to_check.is_empty() {
+            let id1 = *to_check.iter().next().unwrap();
+            to_check.remove(&id1);
+
+            let mut to_merge = Vec::new();
+            for id2 in to_check.iter() {
+                if (self.vertex_position(id1) - self.vertex_position(*id2)).magnitude() < 0.00001 {
+                    to_merge.push(*id2);
+                }
+            }
+            if !to_merge.is_empty() {
+                for id in to_merge.iter() {
+                    to_check.remove(id);
+                }
+                to_merge.push(id1);
+                set_to_merge.push(to_merge);
+            }
+        }
+        set_to_merge
+    }
+
+    fn find_overlapping_faces(
+        &self,
+        set_of_vertices_to_merge: &Vec<Vec<VertexID>>,
+    ) -> Vec<Vec<FaceID>> {
+        let vertices_to_merge = |vertex_id| {
+            set_of_vertices_to_merge
+                .iter()
+                .find(|vec| vec.contains(&vertex_id))
+        };
+        let mut to_check = HashSet::new();
+        self.face_iter().for_each(|id| {
+            to_check.insert(id);
+        });
+
+        let mut set_to_merge = Vec::new();
+        while !to_check.is_empty() {
+            let id1 = *to_check.iter().next().unwrap();
+            to_check.remove(&id1);
+
+            let (v0, v1, v2) = self.face_vertices(id1);
+            if let Some(vertices_to_merge0) = vertices_to_merge(v0) {
+                if let Some(vertices_to_merge1) = vertices_to_merge(v1) {
+                    if let Some(vertices_to_merge2) = vertices_to_merge(v2) {
+                        let mut to_merge = Vec::new();
+                        for id2 in to_check.iter() {
+                            let (v3, v4, v5) = self.face_vertices(*id2);
+                            if (vertices_to_merge0.contains(&v3)
+                                || vertices_to_merge0.contains(&v4)
+                                || vertices_to_merge0.contains(&v5))
+                                && (vertices_to_merge1.contains(&v3)
+                                    || vertices_to_merge1.contains(&v4)
+                                    || vertices_to_merge1.contains(&v5))
+                                && (vertices_to_merge2.contains(&v3)
+                                    || vertices_to_merge2.contains(&v4)
+                                    || vertices_to_merge2.contains(&v5))
+                            {
+                                to_merge.push(*id2);
+                            }
+                        }
+                        if !to_merge.is_empty() {
+                            for id in to_merge.iter() {
+                                to_check.remove(id);
+                            }
+                            to_merge.push(id1);
+                            set_to_merge.push(to_merge);
+                        }
+                    }
+                }
+            }
+        }
+        set_to_merge
+    }
+
+    fn find_overlapping_edges(
+        &self,
+        set_of_vertices_to_merge: &Vec<Vec<VertexID>>,
+    ) -> Vec<Vec<HalfEdgeID>> {
+        let vertices_to_merge = |vertex_id| {
+            set_of_vertices_to_merge
+                .iter()
+                .find(|vec| vec.contains(&vertex_id))
+        };
+        let mut to_check = HashSet::new();
+        self.edge_iter().for_each(|e| {
+            to_check.insert(e);
+        });
+
+        let mut set_to_merge = Vec::new();
+        while !to_check.is_empty() {
+            let id1 = *to_check.iter().next().unwrap();
+            to_check.remove(&id1);
+
+            let (v0, v1) = self.edge_vertices(id1);
+            if let Some(vertices_to_merge0) = vertices_to_merge(v0) {
+                if let Some(vertices_to_merge1) = vertices_to_merge(v1) {
+                    let mut to_merge = Vec::new();
+                    for id2 in to_check.iter() {
+                        let (v0, v1) = self.edge_vertices(*id2);
+                        if vertices_to_merge0.contains(&v0) && vertices_to_merge1.contains(&v1)
+                            || vertices_to_merge1.contains(&v0) && vertices_to_merge0.contains(&v1)
+                        {
+                            to_merge.push(*id2);
+                        }
+                    }
+                    if !to_merge.is_empty() {
+                        for id in to_merge.iter() {
+                            to_check.remove(id);
+                        }
+                        to_merge.push(id1);
+                        set_to_merge.push(to_merge);
+                    }
+                }
+            }
+        }
+        set_to_merge
+    }
+}
