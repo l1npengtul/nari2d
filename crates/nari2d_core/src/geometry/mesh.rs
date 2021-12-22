@@ -1,17 +1,11 @@
 // Modified from delaunator crate to support f32 types.
 
 use crate::{
+    collections::two_elem_move_once::TwoElemMoveOnceVec,
     error::{NResult, Nari2DError},
     geometry::{
-        TMesh,
-        angles_of_triangle,
-        Angle,
-        IndexedPoint2d,
-        Orientation,
-        Point2d,
-        TMeshBuilder
+        angles_of_triangle, Angle, IndexedPoint2d, Orientation, Point2d, TMesh, TMeshBuilder,
     },
-    collections::two_elem_move_once::TwoElemMoveOnceVec,
 };
 use cdt::Error;
 use delaunator::{triangulate, Point};
@@ -34,14 +28,18 @@ impl NariMesh {
         points.sort();
         points.dedup();
 
-        let edges = TwoElemMoveOnceVec::from(concave_hull(&points, 3)?).map(|(start, end)| {
-            (*start, *end)
-        }).collect::<Vec<(usize, usize)>>();
+        let edges = TwoElemMoveOnceVec::from(concave_hull(&points, 3)?)
+            .map(|(start, end)| (*start, *end))
+            .collect::<Vec<(usize, usize)>>();
 
-        let triangulation = cdt::triangulate_with_edges(&points.iter().map(|pt| (pt.x() as f64, pt.y() as f64)).collect::<Vec<(f64, f64)>>(), edges)?;
-        let mut triangle_mesh: TMesh = TMeshBuilder::new()
-            .build()?;
-
+        let triangulation = cdt::triangulate_with_edges(
+            &points
+                .iter()
+                .map(|pt| (pt.x() as f64, pt.y() as f64))
+                .collect::<Vec<(f64, f64)>>(),
+            edges,
+        )?;
+        let mut triangle_mesh: TMesh = TMeshBuilder::new().build()?;
     }
 }
 
