@@ -1,2 +1,2 @@
-mod two_elem_move_once;
+pub mod two_elem_move_once;
 

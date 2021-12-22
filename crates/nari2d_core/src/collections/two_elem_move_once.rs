@@ -77,9 +77,7 @@ impl<'a, T> Iterator for TwoElemMoveOnceVec<T> {
                 Some(loop_value) => {
                     loop_value
                 }
-                None => {
-                    return None,
-                }
+                None => return None,
             }
         };
 

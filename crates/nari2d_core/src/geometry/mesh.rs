@@ -2,8 +2,16 @@
 
 use crate::{
     error::{NResult, Nari2DError},
-    geometry::TMesh,
-    geometry::{angles_of_triangle, Angle, IndexedPoint2d, Orientation, Point2d},
+    geometry::{
+        TMesh,
+        angles_of_triangle,
+        Angle,
+        IndexedPoint2d,
+        Orientation,
+        Point2d,
+        TMeshBuilder
+    },
+    collections::two_elem_move_once::TwoElemMoveOnceVec,
 };
 use cdt::Error;
 use delaunator::{triangulate, Point};
@@ -12,7 +20,6 @@ use std::{
     cmp::Ordering,
     ops::{Index, IndexMut},
 };
-use crate::geometry::PointVec;
 
 #[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Default, Hash, PartialOrd, PartialEq)]
@@ -27,9 +34,14 @@ impl NariMesh {
         points.sort();
         points.dedup();
 
-        let edges = PointVec::from(concave_hull(&points, 3)?);
+        let edges = TwoElemMoveOnceVec::from(concave_hull(&points, 3)?).map(|(start, end)| {
+            (*start, *end)
+        }).collect::<Vec<(usize, usize)>>();
 
-        let triangulation = cdt::triangulate_with_edges()
+        let triangulation = cdt::triangulate_with_edges(&points.iter().map(|pt| (pt.x() as f64, pt.y() as f64)).collect::<Vec<(f64, f64)>>(), edges)?;
+        let mut triangle_mesh: TMesh = TMeshBuilder::new()
+            .build()?;
+
     }
 }
 
