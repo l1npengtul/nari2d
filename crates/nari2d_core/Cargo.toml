@@ -2,12 +2,17 @@
 name = "nari2d_core"
 version = "0.1.0"
 edition = "2021"
+authors = ["l1npengtul <l1npengtul@protonmail.com>"]
+description = "Core Type Definitions and Re-exports for Nari2D"
+keywords = ["nari2d"]
+license = "MPL-2.0/LGPL-3.0"
+repository = "https://github.com/l1npengtul/nari2d"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
 default = ["serde_impl"]
-serde_impl = ["serde", "spade/serde_serialize", "serde_derive", "nalgebra/serde-serialize"]
+serde_impl = ["serde", "serde_derive", "nalgebra/serde-serialize", "staticvec/serde"]
 
 [dependencies]
 thiserror = "^1.0"
@@ -20,13 +25,13 @@ cdt = "0.1.0"
 delaunator = "1.0.1"
 nalgebra = "^0.29"
 robust = "^0.2"
+bimap = "^0.6"
+staticvec = "^0.11"
+itertools = "^0.10"
 
 [dependencies.image]
 version = "^0.23"
 default-features = false
-
-[dependencies.spade]
-version = "^1.8"
 
 [dependencies.serde]
 version = "^1.0"
@@ -41,9 +46,6 @@ optional = true
 [dependencies.smallvec]
 version = "^1.7"
 features = ["serde", "union", "const_generics", "const_new"]
-
-[dependencies.nari2d_mesh]
-path = "../nari2d_mesh"
 
 [dependencies.nari2d_traits]
 path = "../nari2d_traits"

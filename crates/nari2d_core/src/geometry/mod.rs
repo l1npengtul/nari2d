@@ -1,18 +1,14 @@
-use nari2d_mesh::{mesh::Mesh, MeshBuilder};
+use core::ops::{Deref, DerefMut};
 use rstar::{Envelope, Point, PointDistance, RTreeObject, AABB};
-use std::fs::read_to_string;
-use std::ops::{Deref, DerefMut};
-use std::path::Iter;
 
 pub use angle::Angle;
 pub use point2d::Point2d;
 pub use scale2d::Scale2d;
-use test::RunIgnored::No;
 
 mod angle;
 mod bounds;
-mod lattice;
-mod mesh;
+pub mod lattice;
+pub mod mesh;
 mod point2d;
 mod scale2d;
 
@@ -31,10 +27,10 @@ pub type TMeshBuilder = MeshBuilder<f32>;
 ///
 #[inline]
 #[must_use]
-pub fn angles_of_triangle(p1_a: Point2d, p2_b: Point2d, p3_c: Point2d) -> (Angle, Angle, Angle) {
-    let a = Point2d::distance_to(&p3_c, p2_b);
-    let b = Point2d::distance_to(&p1_a, p3_c);
-    let c = Point2d::distance_to(&p2_b, p1_a);
+pub fn angles_of_triangle(p1_a: &Point2d, p2_b: &Point2d, p3_c: &Point2d) -> (Angle, Angle, Angle) {
+    let a = Point2d::distance_to(p3_c, p2_b);
+    let b = Point2d::distance_to(p1_a, p3_c);
+    let c = Point2d::distance_to(p2_b, p1_a);
     let a_2 = a.powi(2);
     let b_2 = b.powi(2);
     let c_2 = c.powi(2);

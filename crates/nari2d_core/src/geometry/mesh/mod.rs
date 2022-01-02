@@ -1,47 +1,16 @@
-// Modified from delaunator crate to support f32 types.
-
 use crate::{
-    collections::two_elem_move_once::TwoElemMoveOnceVec,
     error::{NResult, Nari2DError},
-    geometry::{
-        angles_of_triangle, Angle, IndexedPoint2d, Orientation, Point2d, TMesh, TMeshBuilder,
-    },
+    geometry::{Angle, IndexedPoint2d, Orientation, Point2d},
 };
-use cdt::Error;
-use delaunator::{triangulate, Point};
+use itertools::Itertools;
 use rstar::RTree;
-use std::{
-    cmp::Ordering,
-    ops::{Index, IndexMut},
-};
+use std::{cmp::Ordering, ops::Add};
 
-#[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
-#[derive(Clone, Debug, Default, Hash, PartialOrd, PartialEq)]
-pub struct NariMesh {
-    internal: TMesh,
-}
+mod indices;
+mod nari_mesh;
 
-impl NariMesh {
-    pub fn new(points: Vec<Point2d>) -> NResult<Self> {
-        let mut points = points;
-        // remove duplicates so we dont explode later
-        points.sort();
-        points.dedup();
-
-        let edges = TwoElemMoveOnceVec::from(concave_hull(&points, 3)?)
-            .map(|(start, end)| (*start, *end))
-            .collect::<Vec<(usize, usize)>>();
-
-        let triangulation = cdt::triangulate_with_edges(
-            &points
-                .iter()
-                .map(|pt| (pt.x() as f64, pt.y() as f64))
-                .collect::<Vec<(f64, f64)>>(),
-            edges,
-        )?;
-        let mut triangle_mesh: TMesh = TMeshBuilder::new().build()?;
-    }
-}
+pub use indices::*;
+pub use nari_mesh::NariMesh;
 
 // algorithm from https://www.researchgate.net/publication/220868874_Concave_hull_A_k-nearest_neighbours_approach_for_the_computation_of_the_region_occupied_by_a_set_of_points
 pub fn concave_hull(points: &[Point2d], point_include: usize) -> NResult<Vec<usize>> {
@@ -172,7 +141,6 @@ pub fn segment_intersects(segment_1: [Point2d; 2], segment_2: [Point2d; 2]) -> b
     if ori_1 != ori_2 && ori_3 != ori_4 {
         return true;
     }
-
     if ori_3 == Orientation::Colinear && segment_1[0].point_on_segment(&segment_2[0], &segment_2[1])
     {
         return true;
@@ -191,4 +159,65 @@ pub fn segment_intersects(segment_1: [Point2d; 2], segment_2: [Point2d; 2]) -> b
     }
 
     false
+}
+
+#[inline]
+pub fn area(p1: &Point2d, p2: &Point2d, p3: &Point2d) -> f64 {
+    //                        |  p1.x   p2.x   p3.x   p1.x |
+    // Area of polygon: (0.5)*|                            |
+    //                        |  p1.y   p2.y   p3.y   p1.y |
+    (0.5 * ((p1.x() * p2.y()) + (p2.x() * p3.y()) + (p3.x() * p1.y())
+        - (p1.y() * p2.x())
+        - (p2.y() * p3.x())
+        - (p3.y() * p1.x()))) as f64
+}
+
+#[inline]
+pub fn is_subsegment(supersegment: &(Point2d, Point2d), subsegment: &(Point2d, Point2d)) -> bool {
+    if subsegment
+        .0
+        .point_on_segment(&supersegment.0, &supersegment.1)
+        && subsegment
+            .1
+            .point_on_segment(&supersegment.0, &supersegment.1)
+    {
+        return true;
+    }
+
+    false
+}
+
+const LOWER_BOUND: f32 = 1_f32 / (2_f32 * 2_f32.sqrt());
+const UPPER_BOUND: f32 = 2_f32.sqrt() / 2_f32;
+
+// from https://www.sciencedirect.com/science/article/abs/pii/S0196677485710218
+#[inline]
+pub fn find_power_of_2_splitting(start: &Point2d, end: &Point2d, unit: f32) -> f32 {
+    let length = start.distance_to(end);
+    let lower = LOWER_BOUND * length;
+    let upper = UPPER_BOUND * length;
+    // most solutions will be in this range.
+
+    let mut possible_solutions = (-50..50)
+        .into_iter()
+        .map(|i| unit * (f32::from(2.powi(i)))) // get the 2^i value
+        .filter(|x| &lower <= x && x <= &upper)
+        .collect::<Vec<f32>>();
+    if possible_solutions.len() == 0 {
+        // return bisection
+        return 0.5_f32;
+    }
+    possible_solutions.sort();
+    // SAFETY: we did a bounds check, 1 / 2 = 0.
+    unsafe { *possible_solutions.get_unchecked(possible_solutions.len() / 2) }
+}
+
+#[inline]
+pub fn is_edge_encroached(edge_start: &Point2d, edge_end: &Point2d, point: &Point2d) -> bool {
+    let midpoint = edge_start.mid_point(&edge_end);
+    let radius_2 = midpoint.distance_to(&edge_start).powi(2);
+    let dx_2 = f32::abs(point.x() - midpoint.x()).powi(2);
+    let dy_2 = f32::abs(point.y() - midpoint.y()).powi(2);
+
+    return (dx_2 + dy_2) <= radius_2;
 }

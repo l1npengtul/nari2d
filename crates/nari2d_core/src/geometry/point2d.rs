@@ -1,9 +1,9 @@
 use crate::geometry::{
     lattice::StrengthPoint, nearly_equal_f32, Angle, IndexedPoint2d, Orientation, PointSlice,
-    PointVec, PreCalcConsts, PreCalcConstsSlice, PreCalcMultiplesSlice, Scale2d,
+    PointVec, PreCalcConstsSlice, PreCalcMultiplesSlice, Scale2d,
 };
-use nari2d_mesh::point::TwoDimensionalPoint;
-use robust::{orient2d, Coord};
+use robust::Coord;
+use rstar::{Envelope, Point, RTreeObject, AABB};
 use std::{
     cmp::Ordering,
     fmt::{Display, Formatter},
@@ -20,6 +20,17 @@ pub struct Point2d {
 }
 
 impl Point2d {
+    pub const ZERO: Point2d = Point2d { x: 0.0, y: 0.0 };
+
+    pub const INF: Point2d = Point2d {
+        x: f32::INFINITY,
+        y: f32::INFINITY,
+    };
+
+    pub const NAN: Point2d = Point2d {
+        x: f32::NAN,
+        y: f32::NAN,
+    };
     #[inline]
     #[must_use]
     pub fn new(x: f32, y: f32) -> Self {
@@ -35,13 +46,13 @@ impl Point2d {
     #[inline]
     #[must_use]
     pub fn zero() -> Self {
-        Point2d::default()
+        Point2d::ZERO
     }
 
     #[inline]
     #[must_use]
     pub fn origin() -> Self {
-        Point2d::default()
+        Point2d::ZERO
     }
 
     #[inline]
@@ -165,7 +176,7 @@ impl Point2d {
 
     #[inline]
     #[must_use]
-    pub fn linear_interpolate(self, end: Self, along: f32) -> Self {
+    pub fn linear_interpolate(&self, end: &Self, along: f32) -> Self {
         let along = along.clamp(0_f32, 1_f32);
         Point2d {
             x: self.x + (end.x - self.x) * along,
@@ -175,7 +186,7 @@ impl Point2d {
 
     #[inline]
     #[must_use]
-    pub fn half_way(self, other: Self) -> Self {
+    pub fn mid_point(&self, other: &Self) -> Self {
         Point2d {
             x: (self.x + other.x) / 2_f32,
             y: (self.y + other.y) / 2_f32,
@@ -184,13 +195,13 @@ impl Point2d {
 
     #[inline]
     #[must_use]
-    pub fn slope(self, other: Self) -> f32 {
+    pub fn slope(&self, other: &Self) -> f32 {
         (self.x - other.x) / (self.y - other.y)
     }
 
     #[inline]
     #[must_use]
-    pub fn max(self, other: Self) -> Self {
+    pub fn max(&self, other: &Self) -> Self {
         Point2d {
             x: self.x.max(other.x),
             y: self.y.max(other.y),
@@ -199,7 +210,7 @@ impl Point2d {
 
     #[inline]
     #[must_use]
-    pub fn min(self, other: Self) -> Self {
+    pub fn min(&self, other: &Self) -> Self {
         Point2d {
             x: self.x.min(other.x),
             y: self.y.min(other.y),
@@ -208,32 +219,32 @@ impl Point2d {
 
     #[inline]
     #[must_use]
-    pub fn clamp(self, start: Self, end: Self) -> Self {
-        self.max(start).min(end)
+    pub fn clamp(&self, start: &Self, end: &Self) -> Self {
+        *self.max(start).min(end)
     }
 
     #[inline]
     #[must_use]
-    pub fn re_center(self, old_center: Self, new_center: Self) -> Self {
+    pub fn re_center(&self, old_center: &Self, new_center: &Self) -> Self {
         let difference = new_center - old_center;
         self + difference
     }
 
     #[inline]
     #[must_use]
-    pub fn scale(self, scale: Scale2d) -> Self {
+    pub fn scale(&self, scale: &Scale2d) -> Self {
         Point2d::new(self.x * scale.x(), self.y * scale.y())
     }
 
     #[inline]
     #[must_use]
-    pub fn distance_to(&self, other: Self) -> f32 {
+    pub fn distance_to(&self, other: &Self) -> f32 {
         f32::hypot(self.x - other.x, self.y - other.y)
     }
 
     #[inline]
-    pub fn rotate(&self, angle: Angle, center: Self) -> Self {
-        let temp_translated = self.re_center(center, Point2d::zero());
+    pub fn rotate(&self, angle: Angle, center: &Self) -> Self {
+        let temp_translated = self.re_center(center, &Point2d::zero());
         let sine = angle.sin().radians();
         let cosine = angle.cos().radians();
 
@@ -655,14 +666,12 @@ impl PartialEq for Point2d {
 impl Hash for Point2d {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let data = if self.is_nan() {
-            f32::NAN.to_bits() as u64
+            unsafe { std::mem::transmute::<Point2d, u64>(Point2d::NAN) }
         } else if self.is_infinite() {
-            f32::INFINITY.to_bits() as u64
+            unsafe { std::mem::transmute::<Point2d, u64>(Point2d::INF) }
         } else {
-            let a: [u8; 4] = self.x.to_bits().to_ne_bytes();
-            let b: [u8; 4] = self.y.to_bits().to_ne_bytes();
-            let c = [a[0], a[1], a[2], a[3], b[0], b[1], b[2], b[3]];
-            u64::from_ne_bytes(c)
+            // SAFETY: This operation is safe due to Point2d being repr(C), garunteeing a stable memory layout at runtime.
+            unsafe { std::mem::transmute::<Point2d, u64>(*self) }
         };
         data.hash(state)
     }
@@ -755,5 +764,40 @@ impl TwoDimensionalPoint for Point2d {
 
     fn set_y(&mut self, new_y: Self::SCALAR) {
         self.y = new_y
+    }
+}
+
+impl Point for Point2d {
+    type Scalar = f32;
+    const DIMENSIONS: usize = 2;
+
+    fn generate(generator: impl FnMut(usize) -> Self::Scalar) -> Self {
+        Point2d::new(generator(0), generator(1))
+    }
+
+    fn nth(&self, index: usize) -> Self::Scalar {
+        match index {
+            0 => self.x,
+            1 => self.y,
+            _ => {
+                unreachable!()
+            }
+        }
+    }
+
+    fn nth_mut(&mut self, index: usize) -> &mut Self::Scalar {
+        match index {
+            0 => &mut self.x,
+            1 => &mut self.y,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl RTreeObject for Point2d {
+    type Envelope = AABB<Point2d>;
+
+    fn envelope(&self) -> Self::Envelope {
+        AABB::from_point(*self)
     }
 }

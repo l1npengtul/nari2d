@@ -1,0 +1,10 @@
+[workspace]
+
+members = [
+    "nari2d_animation",
+    "nari2d_anita",
+    "nari2d_file",
+    "nari2d_physics",
+    "nari2d_core",
+    "nari2d_traits"
+]

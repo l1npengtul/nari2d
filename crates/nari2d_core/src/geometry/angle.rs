@@ -36,7 +36,7 @@ impl Angle {
 
     #[inline]
     #[must_use]
-    pub fn from_vectors(vector1: Point2d, vector2: Point2d) -> Self {
+    pub fn from_vectors(vector1: &Point2d, vector2: &Point2d) -> Self {
         let mut angle = f32::atan2(vector1.y(), vector1.x()) - f32::atan2(vector2.y(), vector2.x());
         while angle > PI {
             angle -= TWO_PI;

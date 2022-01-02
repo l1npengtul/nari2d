@@ -3,7 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
     ptr::NonNull,
     slice::from_raw_parts_mut,
-    thread::sleep
+    thread::sleep,
 };
 
 /// A Vector that allows for grouping of 2 elements that only moves 1 at a time, **and** loops back to zero.
@@ -56,6 +56,19 @@ impl<T> From<Vec<T>> for TwoElemMoveOnceVec<T> {
     }
 }
 
+impl<T, V> From<T> for TwoElemMoveOnceVec<V>
+where
+    T: IntoIterator<Item = V>,
+{
+    fn from(src: T) -> Self {
+        let vec = src.into_iter().collect::<Vec<V>>();
+        TwoElemMoveOnceVec {
+            internal: vec,
+            idx: 0,
+        }
+    }
+}
+
 impl<T> Into<Vec<T>> for TwoElemMoveOnceVec<T> {
     fn into(self) -> Vec<T> {
         self.internal
@@ -74,14 +87,12 @@ impl<'a, T> Iterator for TwoElemMoveOnceVec<T> {
         let second_elem = match self.internal.get(self.idx) {
             Some(s) => s,
             None => match self.internal.get(self.idx) {
-                Some(loop_value) => {
-                    loop_value
-                }
+                Some(loop_value) => loop_value,
                 None => return None,
-            }
+            },
         };
 
         self.idx += 1;
-        return Some((first_elem, second_elem))
+        return Some((first_elem, second_elem));
     }
 }
