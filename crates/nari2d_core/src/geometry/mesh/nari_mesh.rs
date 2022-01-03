@@ -1,10 +1,11 @@
-use crate::geometry::mesh::triangle_circumcenter;
 use crate::{
     collections::{
         indexbimap::{IndexBiMap, Values},
+        point_store::PointStore,
         two_elem_move_once::TwoElemMoveOnceVec,
     },
     error::{mesh::MeshError, util::IndexOrValue, NResult},
+    geometry::mesh::triangle_circumcenter,
     geometry::{
         mesh::{
             area, concave_hull, find_power_of_2_splitting, is_edge_encroached, is_subsegment, Edge,
@@ -25,7 +26,7 @@ use std::{
 #[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Default, Hash, PartialOrd, PartialEq)]
 pub struct NariMesh {
-    points: IndexBiMap<PointRef, Point2d>,
+    points: PointStore<PointRef, Point2d>,
     triangles: IndexBiMap<TriangleRef, Triangle>,
     edges: HashMap<Edge, bool, RandomState>,
     point_relations: HashMap<PointRef, HashSet<TriangleRef, RandomState>, RandomState>,
@@ -285,8 +286,6 @@ impl NariMesh {
         let mut encroached_edges = Vec::with_capacity(self.edges.len() / 10);
         let mut encroached_triangles = Vec::with_capacity(self.triangles.len() / 10);
 
-        let mut point_rtree = RTree::bulk_load(self.points.values().map(|pt| *pt).collect());
-
         encroached_edges.append(
             &mut self
                 .edges
@@ -305,7 +304,7 @@ impl NariMesh {
                     let midpoint = Point2d::mid_point(p1, p2);
                     let max_distance = p1.distance_to(&midpoint);
 
-                    for nearest_pt in point_rtree.nearest_neighbor_iter(&midpoint) {
+                    for nearest_pt in self.points.nearest_neighbor_iter(&midpoint) {
                         if nearest_pt == p1 || nearest_pt == p2 {
                             continue;
                         } else {
@@ -326,12 +325,7 @@ impl NariMesh {
 
         encroached_triangles.append(
             &mut self
-                .split_encroached_subsegments(
-                    &mut point_rtree,
-                    &mut encroached_edges,
-                    min_angle,
-                    max_area,
-                )
+                .split_encroached_subsegments(&mut encroached_edges, min_angle, max_area)
                 .into_iter()
                 .map(|tri_ref| self.triangles.get_by_index(&tri_ref))
                 .filter(Option::is_some)
@@ -433,9 +427,16 @@ impl NariMesh {
         Ok(())
     }
 
+    fn insert_circumcenter_with_radius(
+        &mut self,
+        circumcenter: Point2d,
+        radius: f32,
+    ) -> Vec<TriangleRef> {
+        // get points inside or on circumcircle
+    }
+
     fn split_encroached_subsegments(
         &mut self,
-        point_trees: &mut RTree<Point2d>,
         encroached: &mut Vec<Edge>,
         min_angle: Angle,
         max_area: f32,
@@ -465,11 +466,6 @@ impl NariMesh {
                 let (new_edges, new_point_index) =
                     self.split_edge_across(&edge, splitting_vertex_ratio)?;
 
-                match self.points.get_by_index(&new_point_index) {
-                    Some(p) => point_trees.insert(*p),
-                    None => unreachable!(),
-                }
-
                 let (mut bad_edges, mut bad_triangles) =
                     self.new_vertex(new_point_index, min_angle, max_area);
                 encroached.append(&mut bad_edges);
@@ -482,7 +478,7 @@ impl NariMesh {
                     ) {
                         (Some(edge_start), Some(edge_end)) => {
                             let mid_point = edge_start.mid_point(edge_end);
-                            let mut nearest_points = point_trees.nearest_neighbor_iter(&mid_point);
+                            let mut nearest_points = self.points.nearest_neighbor_iter(&mid_point);
                             let close_p1 = nearest_points.next();
                             let close_p2 = nearest_points.next();
                             let close_p3 = nearest_points.next();
