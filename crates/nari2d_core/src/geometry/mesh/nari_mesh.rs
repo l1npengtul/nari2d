@@ -1,3 +1,4 @@
+use crate::geometry::mesh::triangle_circumcenter;
 use crate::{
     collections::{
         indexbimap::{IndexBiMap, Values},
@@ -15,7 +16,10 @@ use crate::{
 use ahash::RandomState;
 use rstar::RTree;
 use staticvec::StaticVec;
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 // This is a similar mesh implementation to Triangle's Triangle based tri-mesh.
 #[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
@@ -278,7 +282,7 @@ impl NariMesh {
             None => f64::INFINITY,
         };
 
-        let mut encroached_edges = Vec::with_capacity(self.subsegments.len());
+        let mut encroached_edges = Vec::with_capacity(self.edges.len() / 10);
         let mut encroached_triangles = Vec::with_capacity(self.triangles.len() / 10);
 
         let mut point_rtree = RTree::bulk_load(self.points.values().map(|pt| *pt).collect());
@@ -406,7 +410,22 @@ impl NariMesh {
         while !encroached_triangles.is_empty() {
             let bad_triangle = unsafe { encroached_triangles.pop().unwrap_unchecked() };
 
-            if let Some(_) = self.triangles.get_by_value(&bad_triangle) {}
+            if let Some(_) = self.triangles.get_by_value(&bad_triangle) {
+                let p1 = match self.points.get_by_index(&bad_triangle.p1()) {
+                    Some(p) => p,
+                    None => continue,
+                };
+                let p2 = match self.points.get_by_index(&bad_triangle.p2()) {
+                    Some(p) => p,
+                    None => continue,
+                };
+                let p3 = match self.points.get_by_index(&bad_triangle.p3()) {
+                    Some(p) => p,
+                    None => continue,
+                };
+
+                let circumcenter = triangle_circumcenter(p1, p2, p3);
+            }
             // TODO: Continue implement
         }
 
@@ -419,7 +438,7 @@ impl NariMesh {
         point_trees: &mut RTree<Point2d>,
         encroached: &mut Vec<Edge>,
         min_angle: Angle,
-        max_size: f32,
+        max_area: f32,
     ) -> Vec<TriangleRef> {
         let bad_triangles = Vec::with_capacity(encroached.len() / 3);
         while !encroached.is_empty() {
@@ -452,7 +471,7 @@ impl NariMesh {
                 }
 
                 let (mut bad_edges, mut bad_triangles) =
-                    self.new_vertex(new_point_index, min_angle, max_size);
+                    self.new_vertex(new_point_index, min_angle, max_area);
                 encroached.append(&mut bad_edges);
                 bad_triangles.append(&mut bad_triangles);
 
@@ -463,8 +482,31 @@ impl NariMesh {
                     ) {
                         (Some(edge_start), Some(edge_end)) => {
                             let mid_point = edge_start.mid_point(edge_end);
-                            if let Some(nearest) = point_trees.nearest_neighbor(&mid_point) {
-                                if is_edge_encroached(edge_start, edge_end, nearest) {
+                            let mut nearest_points = point_trees.nearest_neighbor_iter(&mid_point);
+                            let close_p1 = nearest_points.next();
+                            let close_p2 = nearest_points.next();
+                            let close_p3 = nearest_points.next();
+                            if let Some(cp3) = close_p3 {
+                                if edge_start != cp3
+                                    && edge_end != cp3
+                                    && is_edge_encroached(edge_start, edge_end, cp3)
+                                {
+                                    encroached.push(e);
+                                }
+                            }
+                            if let Some(cp2) = close_p2 {
+                                if edge_start != cp3
+                                    && edge_end != cp3
+                                    && is_edge_encroached(edge_start, edge_end, cp2)
+                                {
+                                    encroached.push(e);
+                                }
+                            }
+                            if let Some(cp1) = close_p1 {
+                                if edge_start != cp1
+                                    && edge_end != cp1
+                                    && is_edge_encroached(edge_start, edge_end, cp1)
+                                {
                                     encroached.push(e);
                                 }
                             }

@@ -221,3 +221,21 @@ pub fn is_edge_encroached(edge_start: &Point2d, edge_end: &Point2d, point: &Poin
 
     return (dx_2 + dy_2) <= radius_2;
 }
+
+// from https://blog.fridaymath.com/two-formulas-for-the-circumcenter
+#[inline]
+pub fn triangle_circumcenter(p1: &Point2d, p2: &Point2d, p3: &Point2d) -> Point2d {
+    let denominator = 2_f32
+        * (p1.x() * (p2.y() - p3.y()) + p2.x() * (p3.y() - p1.y()) + p3.x() * (p1.y() - p2.y()));
+
+    let x_num = p1.x().powi(2) * (p2.y() - p3.y())
+        + p2.x().powi(2) * (p3.y() - p1.y())
+        + p3.x().powi(2) * (p1.y() - p2.y())
+        - (p1.y() - p2.y()) * (p2.y() - p3.y()) * (p3.y() - p1.y());
+    let y_num = p1.y().powi(2) * (p3.x() - p2.x())
+        + p2.y().powi(2) * (p1.x() - p3.x())
+        + p3.y() * (p2.x() - p1.x())
+        - (p3.x() - p2.x()) * (p2.x() - p1.x()) * (p1.x() - p3.x());
+
+    Point2d::new(x_num / denominator, y_num / denominator)
+}

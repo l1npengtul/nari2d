@@ -39,7 +39,7 @@ where
                 capacity.as_usize(),
                 RandomState::new(),
                 RandomState::new(),
-            ),
+            ) as BiHashMap<I, V, RandomState, RandomState>,
             free_indices: BTreeSet::default(),
             index: I::zero(),
         }
@@ -167,6 +167,20 @@ where
     I: NumIndex,
     V: Eq + Hash,
 {
+}
+
+impl<I, V> Default for IndexBiMap<I, V>
+where
+    I: NumIndex,
+    V: Eq + Hash,
+{
+    fn default() -> Self {
+        Self {
+            internal: BiHashMap::default(),
+            free_indices: BTreeSet::default(),
+            index: I::default(),
+        }
+    }
 }
 
 // The underlying store BiHashMap is Send + Sync if L and R are both Send + Sync. Since L is Send + Sync by default (usize), we only need to check if V(R) fits the conditions.
