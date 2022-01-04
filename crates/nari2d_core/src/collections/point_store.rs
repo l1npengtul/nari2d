@@ -74,23 +74,39 @@ impl<I, V> Deref for PointStore<I, V> {
     }
 }
 
-impl<I, V> FromIterator<(I, V)> for PointStore<I, V>
+impl<I, V> From<Vec<V>> for PointStore<I, V>
 where
     I: NumIndex,
-    V: RTreeObject + Eq + Hash,
+    V: RTreeObject + Eq + Hash + Clone,
 {
-    fn from_iter<T: IntoIterator<Item = (I, V)>>(iter: T) -> Self {
-        let into_iter = iter.into_iter();
-        let mut indices: IndexBiMap<I, V> = IndexBiMap::with_capacity(into_iter.count());
-        let mut values = Vec::with_capacity(into_iter.count());
-        into_iter.for_each(|kv| {
-            indices.insert(kv.1);
-            values.push(rc_borrow);
-        });
-        let rtree = RTree::bulk_load(values);
+    fn from(src: Vec<V>) -> Self {
+        let index_store = IndexBiMap::with_data(src.clone());
+        let rtree_store = RTree::bulk_load(src);
+
         PointStore {
-            index_store: indices,
-            rtree_store: rtree,
+            index_store,
+            rtree_store,
         }
     }
 }
+
+// impl<I, V> FromIterator<(I, V)> for PointStore<I, V>
+// where
+//     I: NumIndex,
+//     V: RTreeObject + Eq + Hash,
+// {
+//     fn from_iter<T: IntoIterator<Item = (I, V)>>(iter: T) -> Self {
+//         let into_iter = iter.into_iter();
+//         let mut indices: IndexBiMap<I, V> = IndexBiMap::with_capacity(into_iter.count());
+//         let mut values = Vec::with_capacity(into_iter.count());
+//         into_iter.for_each(|kv| {
+//             indices.insert(kv.1);
+//             values.push(rc_borrow);
+//         });
+//         let rtree = RTree::bulk_load(values);
+//         PointStore {
+//             index_store: indices,
+//             rtree_store: rtree,
+//         }
+//     }
+// }

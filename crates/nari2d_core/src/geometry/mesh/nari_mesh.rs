@@ -1,3 +1,4 @@
+use crate::geometry::mesh::{segment_intersects, triangle_centroid};
 use crate::{
     collections::{
         indexbimap::{IndexBiMap, Values},
@@ -17,6 +18,7 @@ use crate::{
 use ahash::RandomState;
 use rstar::RTree;
 use staticvec::StaticVec;
+use std::collections::hash_set::IntoIter;
 use std::{
     collections::{HashMap, HashSet},
     rc::Rc,
@@ -109,7 +111,7 @@ impl NariMesh {
             }
         }
 
-        let points: IndexBiMap<PointRef, Point2d> = IndexBiMap::with_data(points);
+        let points = points.into();
 
         Ok(NariMesh {
             points,
@@ -429,10 +431,94 @@ impl NariMesh {
 
     fn insert_circumcenter_with_radius(
         &mut self,
+        t_ref: &TriangleRef,
         circumcenter: Point2d,
         radius: f32,
     ) -> Vec<TriangleRef> {
+        let new_triangles = Vec::with_capacity(4);
+        let triangle = match self.triangles.get_by_index(t_ref) {
+            Some(t) => t,
+            None => return new_triangles,
+        };
+
+        let p1 = match self.points.get_by_index(&triangle.p1()) {
+            Some(p) => p,
+            None => return new_triangles,
+        };
+        let p2 = match self.points.get_by_index(&triangle.p2()) {
+            Some(p) => p,
+            None => return new_triangles,
+        };
+        let p3 = match self.points.get_by_index(&triangle.p3()) {
+            Some(p) => p,
+            None => return new_triangles,
+        };
+
+        let bad_triangle_centroid = triangle_centroid(p1, p2, p3);
+        let mut splitting_point = circumcenter;
+
         // get points inside or on circumcircle
+
+        let points_in_circle = self
+            .points
+            .locate_within_distance(circumcenter, radius.powi(2))
+            .collect::<Vec<Point2d>>();
+        let mut triangle_in_circle: HashMap<Triangle, Point2d, RandomState> =
+            HashMap::with_capacity_and_hasher(16, RandomState::new());
+        points_in_circle
+            .iter()
+            .map(|x| self.points.get_by_value(x).unwrap())
+            .map(|i| self.point_relations.get(i).unwrap_or(&HashSet::default()))
+            .fold(&mut triangle_in_circle, |acc, next| {
+                for t_ref in next {
+                    let triangle = match self.triangles.get_by_index(t_ref) {
+                        Some(t) => t,
+                        None => continue,
+                    };
+
+                    let p1 = match self.points.get_by_index(&triangle.p1()) {
+                        Some(p) => p,
+                        None => continue,
+                    };
+                    let p2 = match self.points.get_by_index(&triangle.p2()) {
+                        Some(p) => p,
+                        None => continue,
+                    };
+                    let p3 = match self.points.get_by_index(&triangle.p3()) {
+                        Some(p) => p,
+                        None => continue,
+                    };
+
+                    // ONLY re-intorduce the circle if its centroid is within  the radius
+                    let centroid = triangle_centroid(p1, p2, p3);
+
+                    if centroid.distance_to(&circumcenter) <= radius {
+                        acc.insert(*triangle, centroid);
+                    }
+                }
+                acc
+            });
+
+        // We will check if any of the edges inside are subsegments, and if our point lies on the other side. If so,
+        // the splitting point will be the midpoint of the subsegment to preserve the subsegment.
+
+        for tri in triangle_in_circle.keys() {
+            for edge in tri.edges() {
+                if self.edges.get(&edge).unwrap_or(&false) {
+                    let p1 = match self.points.get_by_index(&edge.start()) {
+                        Some(p) => p,
+                        None => continue,
+                    };
+                    let p2 = match self.points.get_by_index(&edge.end()) {
+                        Some(p) => p,
+                        None => continue,
+                    };
+                    if segment_intersects((&bad_triangle_centroid, &circumcenter), (p1, p2)) {}
+                }
+            }
+        }
+
+        new_triangles
     }
 
     fn split_encroached_subsegments(

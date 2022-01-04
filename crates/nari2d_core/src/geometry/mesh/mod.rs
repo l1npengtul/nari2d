@@ -132,29 +132,28 @@ pub fn concave_hull(points: &[Point2d], point_include: usize) -> NResult<Vec<usi
     return Ok(hull.into());
 }
 
-pub fn segment_intersects(segment_1: [Point2d; 2], segment_2: [Point2d; 2]) -> bool {
-    let ori_1 = Point2d::orientation(&segment_1[0], &segment_1[1], &segment_2[0]);
-    let ori_2 = Point2d::orientation(&segment_1[0], &segment_1[1], &segment_2[1]);
-    let ori_3 = Point2d::orientation(&segment_2[0], &segment_2[1], &segment_1[0]);
-    let ori_4 = Point2d::orientation(&segment_2[0], &segment_2[1], &segment_1[1]);
+pub fn segment_intersects(
+    segment_1: (&Point2d, &Point2d),
+    segment_2: (&Point2d, &Point2d),
+) -> bool {
+    let ori_1 = Point2d::orientation(segment_1.0, segment_1.1, segment_2.0);
+    let ori_2 = Point2d::orientation(segment_1.0, segment_1.1, segment_2.1);
+    let ori_3 = Point2d::orientation(segment_2.0, segment_2.1, segment_1.0);
+    let ori_4 = Point2d::orientation(segment_2.0, segment_2.1, segment_1.1);
 
     if ori_1 != ori_2 && ori_3 != ori_4 {
         return true;
     }
-    if ori_3 == Orientation::Colinear && segment_1[0].point_on_segment(&segment_2[0], &segment_2[1])
-    {
+    if ori_3 == Orientation::Colinear && segment_1[0].point_on_segment(segment_2.0, segment_2.1) {
         return true;
     }
-    if ori_4 == Orientation::Colinear && segment_1[1].point_on_segment(&segment_2[0], &segment_2[1])
-    {
+    if ori_4 == Orientation::Colinear && segment_1[1].point_on_segment(segment_2.0, segment_2.1) {
         return true;
     }
-    if ori_1 == Orientation::Colinear && segment_2[0].point_on_segment(&segment_1[0], &segment_1[1])
-    {
+    if ori_1 == Orientation::Colinear && segment_2[0].point_on_segment(segment_1.0, segment_1.1) {
         return true;
     }
-    if ori_2 == Orientation::Colinear && segment_2[1].point_on_segment(&segment_1[0], &segment_1[1])
-    {
+    if ori_2 == Orientation::Colinear && segment_2[1].point_on_segment(segment_1.0, segment_1.1) {
         return true;
     }
 
@@ -238,4 +237,12 @@ pub fn triangle_circumcenter(p1: &Point2d, p2: &Point2d, p3: &Point2d) -> Point2
         - (p3.x() - p2.x()) * (p2.x() - p1.x()) * (p1.x() - p3.x());
 
     Point2d::new(x_num / denominator, y_num / denominator)
+}
+
+#[inline]
+pub fn triangle_centroid(p1: &Point2d, p2: &Point2d, p3: &Point2d) -> Point2d {
+    Point2d::new(
+        (p1.x() + p2.x() + p3.x()) / 3_f32,
+        (p1.y() + p2.y() + p3.y()) / 3_f32,
+    )
 }
