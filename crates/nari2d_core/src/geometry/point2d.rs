@@ -267,7 +267,7 @@ impl Point2d {
 
     #[inline]
     #[must_use]
-    pub fn atan2(&self, point: &Self) -> Angle {
+    pub fn arc_tan2(&self, point: &Self) -> Angle {
         let homed = point - self;
         Angle::from_radians(homed.y().atan2(homed.x()))
     }
@@ -371,6 +371,27 @@ impl Point2d {
         }
 
         odd_nodes
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn point_on_circle(&self, center: &Point2d, radius: f32, include_on_circle: bool) -> bool {
+        let dx = f32::abs(self.x - center.x);
+        let dy = f32::abs(self.y - center.y);
+
+        if dx > radius || dy > radius {
+            return false;
+        }
+
+        if (dx + dy) >= radius {
+            return true;
+        }
+
+        return if include_on_circle {
+            dx.powi(2) + dy.powi(2) <= radius.powi(2)
+        } else {
+            dx.powi(2) + dy.powi(2) < radius.powi(2)
+        };
     }
 }
 

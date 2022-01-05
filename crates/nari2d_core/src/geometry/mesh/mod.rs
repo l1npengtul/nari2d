@@ -2,7 +2,6 @@ use crate::{
     error::{NResult, Nari2DError},
     geometry::{Angle, IndexedPoint2d, Orientation, Point2d},
 };
-use itertools::Itertools;
 use rstar::RTree;
 use std::{cmp::Ordering, ops::Add};
 
@@ -99,8 +98,8 @@ pub fn concave_hull(points: &[Point2d], point_include: usize) -> NResult<Vec<usi
 
             while its == false && j < hull.len() - last_point {
                 its = segment_intersects(
-                    [hull[step - 1].into(), k_nearest_points_iter[i].into()],
-                    [hull[step - i - j].into(), hull[step - j].into()],
+                    (&hull[step - 1].into(), &k_nearest_points_iter[i].into()),
+                    (&hull[step - i - j].into(), &hull[step - j].into()),
                 );
                 j += 1;
             }
@@ -245,4 +244,36 @@ pub fn triangle_centroid(p1: &Point2d, p2: &Point2d, p3: &Point2d) -> Point2d {
         (p1.x() + p2.x() + p3.x()) / 3_f32,
         (p1.y() + p2.y() + p3.y()) / 3_f32,
     )
+}
+
+// from https://math.stackexchange.com/questions/275529/check-if-line-intersects-with-circles-perimeter
+#[inline]
+pub fn line_intersect_circle(
+    start: &Point2d,
+    end: &Point2d,
+    circle_center: &Point2d,
+    radius: f32,
+) -> bool {
+    let a_start = start - circle_center;
+    let b_end = end - circle_center;
+
+    let a = (b_end.x() - a_start.x()).powi(2) + (b_end.y() - a_start.y()).powi(2);
+    let b =
+        2_f32 * (a_start.x() * (b_end.x() - a_start.x()) + a_start.y() * (b_end.y() - a_start.y()));
+    let c = a_start.x().powi(2) + a_start.y().powi(2) - radius.powi(2);
+    let disc = b.powi(2) - 4_f32 * a * c;
+
+    if disc <= 0_f32 {
+        return false;
+    }
+
+    let sqrt_disc = disc.sqrt();
+    let t1 = (-b + sqrt_disc) / (2_f32 * a);
+    let t2 = (-b - sqrt_disc) / (2_f32 * a);
+
+    if (0_f32 < t1 && t1 < 1_f32) || (0_f32 < t2 && t2 < 1_f32) {
+        return true;
+    }
+
+    return false;
 }

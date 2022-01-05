@@ -1,4 +1,4 @@
-use crate::geometry::mesh::{segment_intersects, triangle_centroid};
+use crate::geometry::mesh::{line_intersect_circle, segment_intersects, triangle_centroid};
 use crate::{
     collections::{
         indexbimap::{IndexBiMap, Values},
@@ -166,7 +166,7 @@ impl NariMesh {
         Some(tri_refs)
     }
 
-    pub fn insert_triangle_raw(&mut self, triangle: Triangle) {
+    pub fn insert_triangle_raw(&mut self, triangle: Triangle) -> TriangleRef {
         let triangle_ref = self.triangles.insert(triangle).0 as TriangleRef;
 
         triangle.points().into_iter().for_each(|p_ref| {
@@ -187,6 +187,8 @@ impl NariMesh {
                 self.edges.insert(edge, false);
             }
         });
+
+        triangle_ref
     }
 
     pub fn split_edge_across(&mut self, edge: &Edge, along: f32) -> NResult<([Edge; 2], PointRef)> {
@@ -435,27 +437,12 @@ impl NariMesh {
         circumcenter: Point2d,
         radius: f32,
     ) -> Vec<TriangleRef> {
-        let new_triangles = Vec::with_capacity(4);
-        let triangle = match self.triangles.get_by_index(t_ref) {
-            Some(t) => t,
-            None => return new_triangles,
-        };
-
-        let p1 = match self.points.get_by_index(&triangle.p1()) {
-            Some(p) => p,
-            None => return new_triangles,
-        };
-        let p2 = match self.points.get_by_index(&triangle.p2()) {
-            Some(p) => p,
-            None => return new_triangles,
-        };
-        let p3 = match self.points.get_by_index(&triangle.p3()) {
-            Some(p) => p,
-            None => return new_triangles,
-        };
-
-        let bad_triangle_centroid = triangle_centroid(p1, p2, p3);
-        let mut splitting_point = circumcenter;
+        let mut new_triangles = Vec::with_capacity(4);
+        let splitting_point_ref = self.points.insert(circumcenter).0;
+        self.point_relations.insert(
+            splitting_point_ref,
+            HashSet::with_capacity_and_hasher(4, RandomState::new()),
+        );
 
         // get points inside or on circumcircle
 
@@ -463,7 +450,7 @@ impl NariMesh {
             .points
             .locate_within_distance(circumcenter, radius.powi(2))
             .collect::<Vec<Point2d>>();
-        let mut triangle_in_circle: HashMap<Triangle, Point2d, RandomState> =
+        let mut triangle_in_circle: HashMap<TriangleRef, Triangle, RandomState> =
             HashMap::with_capacity_and_hasher(16, RandomState::new());
         points_in_circle
             .iter()
@@ -492,8 +479,8 @@ impl NariMesh {
                     // ONLY re-intorduce the circle if its centroid is within  the radius
                     let centroid = triangle_centroid(p1, p2, p3);
 
-                    if centroid.distance_to(&circumcenter) <= radius {
-                        acc.insert(*triangle, centroid);
+                    if centroid.distance_to(&circumcenter) < radius {
+                        acc.insert(*t_ref, *triangle);
                     }
                 }
                 acc
@@ -501,21 +488,96 @@ impl NariMesh {
 
         // We will check if any of the edges inside are subsegments, and if our point lies on the other side. If so,
         // the splitting point will be the midpoint of the subsegment to preserve the subsegment.
+        // TODO
+        // for tri in triangle_in_circle.keys() {
+        //     for edge in tri.edges() {
+        //         if self.edges.get(&edge).unwrap_or(&false) {
+        //             let p1 = match self.points.get_by_index(&edge.start()) {
+        //                 Some(p) => p,
+        //                 None => continue,
+        //             };
+        //             let p2 = match self.points.get_by_index(&edge.end()) {
+        //                 Some(p) => p,
+        //                 None => continue,
+        //             };
+        //             if segment_intersects((&bad_triangle_centroid, &circumcenter), (p1, p2)) {}
+        //         }
+        //     }
+        // }
 
-        for tri in triangle_in_circle.keys() {
-            for edge in tri.edges() {
-                if self.edges.get(&edge).unwrap_or(&false) {
-                    let p1 = match self.points.get_by_index(&edge.start()) {
-                        Some(p) => p,
-                        None => continue,
-                    };
-                    let p2 = match self.points.get_by_index(&edge.end()) {
-                        Some(p) => p,
-                        None => continue,
-                    };
-                    if segment_intersects((&bad_triangle_centroid, &circumcenter), (p1, p2)) {}
+        let mut points_to_remove = Vec::new();
+        let mut points_to_connect = TwoElemMoveOnceVec::new();
+
+        // delete points, triangle, edges inside the circle.
+        for (tri_ref, triangle) in triangle_in_circle {
+            // remove triangle from points
+            // check if point is eligible for removal
+            let p1 = match self.points.remove_by_index(&triangle.p1()) {
+                Some((r, p)) => {
+                    if let Some(t_set) = self.point_relations.get_mut(&tri_ref) {
+                        t_set.remove(&r);
+                    }
+                    if p.point_on_circle(&circumcenter, radius, false) {
+                        points_to_remove.push(r)
+                    } else {
+                        points_to_connect.push(r);
+                    }
+                    p
                 }
+                None => continue,
+            };
+            let p2 = match self.points.remove_by_index(&triangle.p2()) {
+                Some((r, p)) => {
+                    if let Some(t_set) = self.point_relations.get_mut(&tri_ref) {
+                        t_set.remove(&r);
+                    }
+                    if p.point_on_circle(&circumcenter, radius, false) {
+                        points_to_remove.push(r)
+                    } else {
+                        points_to_connect.push(r);
+                    }
+                    p
+                }
+                None => continue,
+            };
+            let p3 = match self.points.remove_by_index(&triangle.p3()) {
+                Some((r, p)) => {
+                    if let Some(t_set) = self.point_relations.get_mut(&tri_ref) {
+                        t_set.remove(&r);
+                    }
+                    if p.point_on_circle(&circumcenter, radius, false) {
+                        points_to_remove.push(r)
+                    } else {
+                        points_to_connect.push(r);
+                    }
+                    p
+                }
+                None => continue,
+            };
+
+            // check edges
+            if line_intersect_circle(&p1, &p2, &circumcenter, radius) {
+                self.edges.remove(&Edge::new(triangle.p1(), triangle.p2()));
             }
+            if line_intersect_circle(&p2, &p3, &circumcenter, radius) {
+                self.edges.remove(&Edge::new(triangle.p2(), triangle.p3()));
+            }
+            if line_intersect_circle(&p1, &p3, &circumcenter, radius) {
+                self.edges.remove(&Edge::new(triangle.p1(), triangle.p3()));
+            }
+        }
+
+        for point in points_to_remove {
+            self.points.remove_by_index(&point);
+            self.point_relations.remove(&point);
+        }
+
+        for (sp, ep) in points_to_connect {
+            new_triangles.push(self.insert_triangle_raw(Triangle::new(
+                *sp,
+                *ep,
+                splitting_point_ref,
+            )));
         }
 
         new_triangles
