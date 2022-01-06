@@ -17,8 +17,10 @@ use crate::{
 };
 use ahash::RandomState;
 use rstar::RTree;
-use staticvec::StaticVec;
+use staticvec::{staticvec, StaticVec};
 use std::collections::hash_set::IntoIter;
+use std::collections::BTreeSet;
+use std::ops::Index;
 use std::{
     collections::{HashMap, HashSet},
     rc::Rc,
@@ -423,20 +425,67 @@ impl NariMesh {
                 };
 
                 let circumcenter = triangle_circumcenter(p1, p2, p3);
-                let encroached_edges = {};
-            }
-            // TODO: Continue implement
-        }
+                let radius = circumcenter.distance_to(p1);
+                let e_edges = {
+                    // we could probably do this better by using rtree, closest, etc etc
+                    let mut ee = BTreeSet::new();
 
-        //
+                    for edge in self.edges.keys() {
+                        let p1 = match self.points.get_by_index(&edge.start()) {
+                            Some(p) => p,
+                            None => continue,
+                        };
+                        let p2 = match self.points.get_by_index(&edge.end()) {
+                            Some(p) => p,
+                            None => continue,
+                        };
+
+                        if is_edge_encroached(p1, p2, &circumcenter) {
+                            ee.insert(*edge);
+                        }
+                    }
+                    ee
+                };
+
+                if e_edges.len() == 0 {
+                    let new_point = self.insert_circumcenter_with_radius(circumcenter, radius).1;
+                    let (mut bad_edges, bad_t_refs) =
+                        self.new_vertex(new_point, min_angle, max_area);
+                    for t_ref in bad_t_refs {
+                        match self.triangles.get_by_index(&t_ref) {
+                            Some(t) => {
+                                encroached_triangles.push(*t);
+                            }
+                            None => continue,
+                        }
+                    }
+                    encroached_edges.append(&mut bad_edges);
+                } else {
+                    let shortest_edge = {
+                        let mut distances =
+                            staticvec![p1.distance_to(p2), p2.distance_to(p3), p1.distance_to(p3)];
+                        distances.sort();
+                        distances[0]
+                    };
+
+                    for edge in e_edges {
+                        if area(p1, p2, p3) > max_area
+                    }
+                }
+            }
+        }
         Ok(())
+    }
+
+    fn split_permitted(&mut self, edge: &Edge, length: f32) -> bool {
+
     }
 
     fn insert_circumcenter_with_radius(
         &mut self,
         circumcenter: Point2d,
         radius: f32,
-    ) -> Vec<TriangleRef> {
+    ) -> (Vec<TriangleRef>, PointRef) {
         let mut new_triangles = Vec::with_capacity(4);
         let splitting_point_ref = self.points.insert(circumcenter).0;
         self.point_relations.insert(
@@ -569,7 +618,7 @@ impl NariMesh {
             )));
         }
 
-        new_triangles
+        (new_triangles, splitting_point_ref)
     }
 
     fn split_encroached_subsegments(
