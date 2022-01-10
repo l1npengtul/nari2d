@@ -497,13 +497,18 @@ impl NariMesh {
         // angles. For each angle >= 60, we add to subsegment. if < 60, we add a new cell. the no. of cells
         // is how many subsegments this is a part of
 
-        let subsegments = vec![false];
+        let subsegment_clusters: Vec<HashSet<(Point2d, Point2d)>> = Vec::new();
 
         // go down p1
         match self.point_relations.get(&edge.start()) {
             Some(tris) => {
-                let point_ref = edge.start();
-                let point = match self.points.get_by_index(&point_ref) {
+                let point_ref_start = edge.start();
+                let point_start = match self.points.get_by_index(&point_ref_start) {
+                    Some(pt) => pt,
+                    None => return false,
+                };
+                let point_ref_end = edge.end();
+                let point_end = match self.points.get_by_index(&point_ref_end) {
                     Some(pt) => pt,
                     None => return false,
                 };
@@ -512,7 +517,7 @@ impl NariMesh {
                     .filter_map(|tri| {
                         if let Some(triangle) = self.triangles.get_by_index(tri) {
                             Some(triangle.edges().into_iter().filter_map(|edge| {
-                                if edge.start() == point_ref || edge.end() == point_ref {
+                                if edge.start() == point_ref_start || edge.end() == point_ref_start {
                                     Some(edge)
                                 } else {
                                     None
@@ -522,12 +527,12 @@ impl NariMesh {
                             None
                         }
                     }).flatten().filter_map(|edge| {
-                    if edge.start() != point_ref {
+                    if edge.start() != point_ref_start {
                         Some(match self.points.get_by_index(&edge.start()) {
                             Some(pt) => *pt,
                             None => return None,
                         })
-                    } else if edge.end() != point_ref {
+                    } else if edge.end() != point_ref_start {
                         Some(match self.points.get_by_index(&edge.end()) {
                                 Some(pt) => *pt,
                                 None => return None,
@@ -535,11 +540,20 @@ impl NariMesh {
                     } else {
                         None
                     }
-                }).collect::<Vec<Point2d>>();
+                }).collect::<TwoElemMoveOnceVec<Point2d>>();
 
                 points_adjacent.sort_by(|prev, next| {
-                    point.angle_of_3(&Point2d::zero(), prev).cmp(&point.angle_of_3(&Point2d::zero(), next))
+                    point_start.angle_of_3(point_end, prev).cmp(&point_start.angle_of_3(point_end, next))
                 });
+
+                let mut holding_set = HashSet::new();
+
+                for (p1, p2) in points_adjacent {
+                    let p1 = *p1;
+                    let p2 = *p2;
+
+
+                }
             }
             None => {}
         }
