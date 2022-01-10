@@ -1,5 +1,6 @@
 use core::ops::{Deref, DerefMut};
 use rstar::{Envelope, Point, PointDistance, RTreeObject, AABB};
+use std::cmp::Ordering;
 
 pub use angle::Angle;
 pub use point2d::Point2d;
@@ -99,7 +100,7 @@ fn nearly_equal_f32(n: f32, m: f32) -> bool {
 
 #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Orientation {
-    Colinear = 0,
+    CoLinear = 0,
     ClockWise = 1,
     CounterClockWise = 2,
 }
@@ -130,4 +131,30 @@ pub fn pre_calculate_polygon_values(polygon: &[Point2d]) -> (PreCalcMultiples, P
         }
     }
     (multi_precalc, const_precalc)
+}
+
+// See f32::total_cmp().
+#[inline]
+pub(crate) fn float_cmp(left: &f32, right: &f32) -> Ordering {
+    if left.is_nan() && right.is_nan() {
+        return Ordering::Equal;
+    } else if left.is_infinite() && right.is_infinite() {
+        return Ordering::Equal;
+    } else if left.is_nan() && !right.is_nan() {
+        return Ordering::Greater;
+    } else if !left.is_nan() && right.is_nan() {
+        return Ordering::Less;
+    } else if !left.is_infinite() && right.is_infinite() {
+        return Ordering::Less;
+    } else if left.is_infinite() && !right.is_infinite() {
+        return Ordering::Greater;
+    }
+
+    let mut left = left.to_bits() as i32;
+    let mut right = right.to_bits() as i32;
+
+    left ^= (((left >> 31) as u32) >> 1) as i32;
+    right ^= (((right >> 31) as u32) >> 1) as i32;
+
+    left.cmp(&right)
 }

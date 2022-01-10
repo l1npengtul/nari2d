@@ -1,6 +1,6 @@
 use crate::geometry::{
-    lattice::StrengthPoint, nearly_equal_f32, Angle, IndexedPoint2d, Orientation, PointSlice,
-    PointVec, PreCalcConstsSlice, PreCalcMultiplesSlice, Scale2d,
+    float_cmp, lattice::StrengthPoint, nearly_equal_f32, Angle, IndexedPoint2d, Orientation,
+    PointSlice, PointVec, PreCalcConstsSlice, PreCalcMultiplesSlice, Scale2d,
 };
 use robust::Coord;
 use rstar::{Envelope, Point, RTreeObject, AABB};
@@ -311,7 +311,7 @@ impl Point2d {
         let slope_difference = (b.y - self.y) * (c.x - b.x) - (b.x - self.x) * (c.y - b.y);
 
         return if nearly_equal_f32(slope_difference, 0_f32) {
-            Orientation::Colinear
+            Orientation::CoLinear
         } else if nearly_equal_f32(slope_difference, 1_f32) {
             Orientation::ClockWise
         } else {
@@ -699,27 +699,6 @@ impl Hash for Point2d {
 }
 
 impl Eq for Point2d {}
-
-// See f32::total_cmp().
-pub(crate) fn float_cmp(left: &f32, right: &f32) -> Ordering {
-    if left.is_nan() && right.is_nan() {
-        return Ordering::Equal;
-    } else if left.is_infinite() && right.is_infinite() {
-        return Ordering::Equal;
-    } else if left.is_nan() && !right.is_nan() {
-        return Ordering::Less;
-    } else if !left.is_nan() && right.is_nan() {
-        return Ordering::Greater;
-    }
-
-    let mut left = left.to_bits() as i32;
-    let mut right = right.to_bits() as i32;
-
-    left ^= (((left >> 31) as u32) >> 1) as i32;
-    right ^= (((right >> 31) as u32) >> 1) as i32;
-
-    left.cmp(&right)
-}
 
 impl Ord for Point2d {
     #[inline]

@@ -143,16 +143,16 @@ pub fn segment_intersects(
     if ori_1 != ori_2 && ori_3 != ori_4 {
         return true;
     }
-    if ori_3 == Orientation::Colinear && segment_1[0].point_on_segment(segment_2.0, segment_2.1) {
+    if ori_3 == Orientation::CoLinear && segment_1[0].point_on_segment(segment_2.0, segment_2.1) {
         return true;
     }
-    if ori_4 == Orientation::Colinear && segment_1[1].point_on_segment(segment_2.0, segment_2.1) {
+    if ori_4 == Orientation::CoLinear && segment_1[1].point_on_segment(segment_2.0, segment_2.1) {
         return true;
     }
-    if ori_1 == Orientation::Colinear && segment_2[0].point_on_segment(segment_1.0, segment_1.1) {
+    if ori_1 == Orientation::CoLinear && segment_2[0].point_on_segment(segment_1.0, segment_1.1) {
         return true;
     }
-    if ori_2 == Orientation::Colinear && segment_2[1].point_on_segment(segment_1.0, segment_1.1) {
+    if ori_2 == Orientation::CoLinear && segment_2[1].point_on_segment(segment_1.0, segment_1.1) {
         return true;
     }
 
@@ -185,20 +185,20 @@ pub fn is_subsegment(supersegment: &(Point2d, Point2d), subsegment: &(Point2d, P
     false
 }
 
-const LOWER_BOUND: f32 = 1_f32 / (2_f32 * 2_f32.sqrt());
-const UPPER_BOUND: f32 = 2_f32.sqrt() / 2_f32;
+pub const LOWER_BOUND_SPLITTING_UNMULTI: f32 = 1_f32 / (2_f32 * 2_f32.sqrt());
+pub const UPPER_BOUND_SPLITTING_UNMULTI: f32 = 2_f32.sqrt() / 2_f32;
 
 // from https://www.sciencedirect.com/science/article/abs/pii/S0196677485710218
 #[inline]
 pub fn find_power_of_2_splitting(start: &Point2d, end: &Point2d, unit: f32) -> f32 {
     let length = start.distance_to(end);
-    let lower = LOWER_BOUND * length;
-    let upper = UPPER_BOUND * length;
+    let lower = LOWER_BOUND_SPLITTING_UNMULTI * length;
+    let upper = UPPER_BOUND_SPLITTING_UNMULTI * length;
     // most solutions will be in this range.
 
     let mut possible_solutions = (-50..50)
         .into_iter()
-        .map(|i| unit * (f32::from(2.powi(i)))) // get the 2^i value
+        .map(|i| unit * (f32::from(2_f32.powi(i)))) // get the 2^i value
         .filter(|x| &lower <= x && x <= &upper)
         .collect::<Vec<f32>>();
     if possible_solutions.len() == 0 {

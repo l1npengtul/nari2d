@@ -1,4 +1,5 @@
-use crate::geometry::Point2d;
+use crate::geometry::{float_cmp, nearly_equal_f32, Point2d};
+use std::cmp::Ordering;
 use std::{
     fmt::{Display, Formatter},
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Rem, RemAssign, Sub, SubAssign},
@@ -8,7 +9,7 @@ const TWO_PI: f32 = core::f32::consts::PI * 2_f32;
 const PI: f32 = core::f32::consts::PI;
 
 #[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
-#[derive(Copy, Clone, Default, Debug, PartialOrd, PartialEq)]
+#[derive(Copy, Clone, Default, Debug)]
 #[repr(C)]
 pub struct Angle {
     radians: f32,
@@ -101,6 +102,26 @@ impl Angle {
             angle += TWO_PI;
         }
         Angle::new(angle)
+    }
+}
+
+impl PartialEq<Self> for Angle {
+    fn eq(&self, other: &Self) -> bool {
+        nearly_equal_f32(self.radians(), other.radians())
+    }
+}
+
+impl Eq for Angle {}
+
+impl PartialOrd for Angle {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Angle {
+    fn cmp(&self, other: &Self) -> Ordering {
+        float_cmp(&self.radians(), &other.radians())
     }
 }
 

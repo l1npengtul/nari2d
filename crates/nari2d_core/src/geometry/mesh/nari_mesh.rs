@@ -478,7 +478,73 @@ impl NariMesh {
     }
 
     fn split_permitted(&mut self, edge: &Edge, length: f32) -> bool {
+        // what the FUCK is a subsegment cluster
+        // <insert dog wheelchair image>
 
+        // since the power of 2^i formula is self.area * 2^i = edge_length,
+        // i = log_2(((edge_length / self.area) / 2))
+        let nearest_power = (2_f32 * length / self.unit).log2();
+        let nearest_power_pos_diff = nearest_power - ((nearest_power as u32) as f32);
+        let nearest_power_neg_diff = (((nearest_power as u32) as f32) - nearest_power).abs();
+        let tolerance = 0.2_f32;
+        if *(self.edges.get(edge).unwrap_or(&false)) || (nearest_power_pos_diff <= tolerance && nearest_power_neg_diff >= tolerance) {
+            return true;
+        }
+
+        // go down each edge of the edge to find its point and see if its a cluster.
+        // We obtain that through getting the triangles with that point then getting all the
+        // edges. We then orient then clockwise around the center point +Y up, then we measure all the
+        // angles. For each angle >= 60, we add to subsegment. if < 60, we add a new cell. the no. of cells
+        // is how many subsegments this is a part of
+
+        let subsegments = vec![false];
+
+        // go down p1
+        match self.point_relations.get(&edge.start()) {
+            Some(tris) => {
+                let point_ref = edge.start();
+                let point = match self.points.get_by_index(&point_ref) {
+                    Some(pt) => pt,
+                    None => return false,
+                };
+
+                let mut points_adjacent = tris.iter()
+                    .filter_map(|tri| {
+                        if let Some(triangle) = self.triangles.get_by_index(tri) {
+                            Some(triangle.edges().into_iter().filter_map(|edge| {
+                                if edge.start() == point_ref || edge.end() == point_ref {
+                                    Some(edge)
+                                } else {
+                                    None
+                                }
+                            }).collect::<Vec<Edge>>())
+                        } else {
+                            None
+                        }
+                    }).flatten().filter_map(|edge| {
+                    if edge.start() != point_ref {
+                        Some(match self.points.get_by_index(&edge.start()) {
+                            Some(pt) => *pt,
+                            None => return None,
+                        })
+                    } else if edge.end() != point_ref {
+                        Some(match self.points.get_by_index(&edge.end()) {
+                                Some(pt) => *pt,
+                                None => return None,
+                        })
+                    } else {
+                        None
+                    }
+                }).collect::<Vec<Point2d>>();
+
+                points_adjacent.sort_by(|prev, next| {
+                    point.angle_of_3(&Point2d::zero(), prev).cmp(&point.angle_of_3(&Point2d::zero(), next))
+                });
+            }
+            None => {}
+        }
+
+        false
     }
 
     fn insert_circumcenter_with_radius(
