@@ -19,7 +19,7 @@ use ahash::RandomState;
 use rstar::RTree;
 use staticvec::{staticvec, StaticVec};
 use std::collections::hash_set::IntoIter;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Index;
 use std::{
     collections::{HashMap, HashSet},
@@ -540,19 +540,22 @@ impl NariMesh {
                     } else {
                         None
                     }
-                }).collect::<TwoElemMoveOnceVec<Point2d>>();
+                }).map(|pt| {
+                    (pt, point_start.angle_of_3(point_end, &pt))
+                }).collect::<Vec<(Point2d, Angle)>>();
 
                 points_adjacent.sort_by(|prev, next| {
-                    point_start.angle_of_3(point_end, prev).cmp(&point_start.angle_of_3(point_end, next))
+                    prev.1.cmp(&next.1)
                 });
 
+
+                let sixty_degrees = Angle::from_degrees(60_f32);
                 let mut holding_set = HashSet::new();
 
-                for (p1, p2) in points_adjacent {
-                    let p1 = *p1;
-                    let p2 = *p2;
+                for (point, angle) in points_adjacent.into_iter() {
+                    if angle < sixty_degrees {
 
-
+                    }
                 }
             }
             None => {}
