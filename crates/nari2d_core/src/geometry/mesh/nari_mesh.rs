@@ -497,22 +497,21 @@ impl NariMesh {
         // angles. For each angle >= 60, we add to subsegment. if < 60, we add a new cell. the no. of cells
         // is how many subsegments this is a part of
 
-        let subsegment_clusters: Vec<HashSet<(Point2d, Point2d)>> = Vec::new();
+        let mut subsegment_clusters: Vec<HashSet<(Point2d, Point2d)>> = Vec::new();
+        let point_ref_start = edge.start();
+        let point_start = match self.points.get_by_index(&point_ref_start) {
+            Some(pt) => pt,
+            None => return false,
+        };
+        let point_ref_end = edge.end();
+        let point_end = match self.points.get_by_index(&point_ref_end) {
+            Some(pt) => pt,
+            None => return false,
+        };
 
         // go down p1
         match self.point_relations.get(&edge.start()) {
             Some(tris) => {
-                let point_ref_start = edge.start();
-                let point_start = match self.points.get_by_index(&point_ref_start) {
-                    Some(pt) => pt,
-                    None => return false,
-                };
-                let point_ref_end = edge.end();
-                let point_end = match self.points.get_by_index(&point_ref_end) {
-                    Some(pt) => pt,
-                    None => return false,
-                };
-
                 let mut points_adjacent = tris.iter()
                     .filter_map(|tri| {
                         if let Some(triangle) = self.triangles.get_by_index(tri) {
@@ -550,16 +549,48 @@ impl NariMesh {
 
 
                 let sixty_degrees = Angle::from_degrees(60_f32);
+                let mut prev_angle = Angle::new(0_f32);
+                let mut prev_point = Point2d::zero();
                 let mut holding_set = HashSet::new();
 
                 for (point, angle) in points_adjacent.into_iter() {
-                    if angle < sixty_degrees {
-
+                    if (angle - prev_angle) > sixty_degrees {
+                        subsegment_clusters.push(holding_set.clone());
+                        holding_set.clear();
                     }
+                    holding_set.insert((point, prev_point));
+                    prev_angle = angle;
+                    prev_point = point;
+                }
+                if !holding_set.is_empty() {
+                    subsegment_clusters.push(holding_set);
                 }
             }
             None => {}
         }
+
+        if subsegment_clusters.len() >= 2 {
+            return true;
+        }
+
+        let cluster = match subsegment_clusters.get(0) {
+            Some(c) => c,
+            None => {
+                return false;
+            }
+        };
+
+        let exists_shortest = false;
+        let this_edge_distance = point_start.distance_to(point_end);
+
+        for (p1, p2) in cluster {
+            let edge_dist = p1.distance_to(p2);
+            if edge_dist < this_edge_distance {
+                return true;
+            }
+        }
+
+
 
         false
     }
