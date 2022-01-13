@@ -78,8 +78,8 @@ impl Angle {
 
     #[inline]
     #[must_use]
-    pub fn sin(self) -> Angle {
-        Angle::from_radians(self.radians.sin())
+    pub fn sin(self) -> f32 {
+        self.radians.sin()
     }
 
     #[inline]

@@ -1,4 +1,3 @@
-use crate::geometry::mesh::{line_intersect_circle, segment_intersects, triangle_centroid};
 use crate::{
     collections::{
         indexbimap::{IndexBiMap, Values},
@@ -6,11 +5,11 @@ use crate::{
         two_elem_move_once::TwoElemMoveOnceVec,
     },
     error::{mesh::MeshError, util::IndexOrValue, NResult},
-    geometry::mesh::triangle_circumcenter,
     geometry::{
         mesh::{
-            area, concave_hull, find_power_of_2_splitting, is_edge_encroached, is_subsegment, Edge,
-            PointRef, Triangle, TriangleRef,
+            area, concave_hull, find_power_of_2_splitting, is_edge_encroached, is_subsegment,
+            line_intersect_circle, segment_intersects, triangle_centroid, triangle_circumcenter,
+            Edge, PointRef, Triangle, TriangleRef,
         },
         Angle, Point2d,
     },
@@ -18,11 +17,9 @@ use crate::{
 use ahash::RandomState;
 use rstar::RTree;
 use staticvec::{staticvec, StaticVec};
-use std::collections::hash_set::IntoIter;
-use std::collections::{BTreeMap, BTreeSet};
-use std::ops::Index;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{hash_set::IntoIter, BTreeMap, BTreeSet, HashMap, HashSet},
+    ops::Index,
     rc::Rc,
 };
 
@@ -40,11 +37,13 @@ pub struct NariMesh {
 impl NariMesh {
     pub fn new(points: Vec<Point2d>) -> NResult<Self> {
         let mut points = points;
-        // remove duplicates so we dont explode later
+        // remove duplicates so we don't explode later
         points.sort();
         points.dedup();
 
-        let mut input_edges = TwoElemMoveOnceVec::from(concave_hull(&points, 3)?)
+        let concave_hull = concave_hull(&points, 3)?;
+
+        let mut input_edges = TwoElemMoveOnceVec::from(concave_hull.into_iter())
             .map(|(start, end)| (*start, *end))
             .collect::<Vec<(usize, usize)>>();
 
@@ -98,17 +97,17 @@ impl NariMesh {
                 }
             }
 
-            for subedge in triangle.edges() {
+            for sub_edge in triangle.edges() {
                 let sub_point_edge = (
-                    points[subedge.start() as usize],
-                    points[subedge.end() as usize],
+                    points[sub_edge.start() as usize],
+                    points[sub_edge.end() as usize],
                 );
-                for superedge in input_edges.iter() {
+                for super_edge in input_edges.iter() {
                     let super_point_edge = (
-                        points[superedge.start() as usize],
-                        points[superedge.end() as usize],
+                        points[super_edge.start() as usize],
+                        points[super_edge.end() as usize],
                     );
-                    edges.insert(subedge, is_subsegment(&super_point_edge, &sub_point_edge));
+                    edges.insert(sub_edge, is_subsegment(&super_point_edge, &sub_point_edge));
                 }
             }
         }
@@ -469,7 +468,20 @@ impl NariMesh {
                     };
 
                     for edge in e_edges {
-                        if area(p1, p2, p3) > max_area
+                        if area(p1, p2, p3) > max_area as f64
+                            || self.split_permitted(&edge, shortest_edge)
+                        {
+                            encroached_edges.push(edge)
+                        }
+                    }
+
+                    if !encroached_edges.is_empty() {
+                        encroached_triangles.push(bad_triangle);
+                        self.split_encroached_subsegments(
+                            &mut encroached_edges,
+                            min_angle,
+                            max_area,
+                        );
                     }
                 }
             }
@@ -487,7 +499,9 @@ impl NariMesh {
         let nearest_power_pos_diff = nearest_power - ((nearest_power as u32) as f32);
         let nearest_power_neg_diff = (((nearest_power as u32) as f32) - nearest_power).abs();
         let tolerance = 0.2_f32;
-        if *(self.edges.get(edge).unwrap_or(&false)) || (nearest_power_pos_diff <= tolerance && nearest_power_neg_diff >= tolerance) {
+        if *(self.edges.get(edge).unwrap_or(&false))
+            || (nearest_power_pos_diff <= tolerance && nearest_power_neg_diff >= tolerance)
+        {
             return true;
         }
 
@@ -500,57 +514,64 @@ impl NariMesh {
         let mut subsegment_clusters: Vec<HashSet<(Point2d, Point2d)>> = Vec::new();
         let point_ref_start = edge.start();
         let point_start = match self.points.get_by_index(&point_ref_start) {
-            Some(pt) => pt,
+            Some(pt) => *pt,
             None => return false,
         };
         let point_ref_end = edge.end();
         let point_end = match self.points.get_by_index(&point_ref_end) {
-            Some(pt) => pt,
+            Some(pt) => *pt,
             None => return false,
         };
 
         // go down p1
         match self.point_relations.get(&edge.start()) {
             Some(tris) => {
-                let mut points_adjacent = tris.iter()
+                let mut points_adjacent = tris
+                    .iter()
                     .filter_map(|tri| {
                         if let Some(triangle) = self.triangles.get_by_index(tri) {
-                            Some(triangle.edges().into_iter().filter_map(|edge| {
-                                if edge.start() == point_ref_start || edge.end() == point_ref_start {
-                                    Some(edge)
-                                } else {
-                                    None
-                                }
-                            }).collect::<Vec<Edge>>())
+                            Some(
+                                triangle
+                                    .edges()
+                                    .into_iter()
+                                    .filter_map(|edge| {
+                                        if edge.start() == point_ref_start
+                                            || edge.end() == point_ref_start
+                                        {
+                                            Some(edge)
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                    .collect::<Vec<Edge>>(),
+                            )
                         } else {
                             None
                         }
-                    }).flatten().filter_map(|edge| {
-                    if edge.start() != point_ref_start {
-                        Some(match self.points.get_by_index(&edge.start()) {
-                            Some(pt) => *pt,
-                            None => return None,
-                        })
-                    } else if edge.end() != point_ref_start {
-                        Some(match self.points.get_by_index(&edge.end()) {
+                    })
+                    .flatten()
+                    .filter_map(|edge| {
+                        if edge.start() != point_ref_start {
+                            Some(match self.points.get_by_index(&edge.start()) {
                                 Some(pt) => *pt,
                                 None => return None,
-                        })
-                    } else {
-                        None
-                    }
-                }).map(|pt| {
-                    (pt, point_start.angle_of_3(point_end, &pt))
-                }).collect::<Vec<(Point2d, Angle)>>();
+                            })
+                        } else if edge.end() != point_ref_start {
+                            Some(match self.points.get_by_index(&edge.end()) {
+                                Some(pt) => *pt,
+                                None => return None,
+                            })
+                        } else {
+                            None
+                        }
+                    })
+                    .map(|pt| (pt, point_start.angle_of_3(&point_end, &pt)))
+                    .collect::<Vec<(Point2d, Angle)>>();
 
-                points_adjacent.sort_by(|prev, next| {
-                    prev.1.cmp(&next.1)
-                });
-
+                points_adjacent.sort_by(|prev, next| prev.1.cmp(&next.1));
 
                 let sixty_degrees = Angle::from_degrees(60_f32);
                 let mut prev_angle = Angle::new(0_f32);
-                let mut prev_point = Point2d::zero();
                 let mut holding_set = HashSet::new();
 
                 for (point, angle) in points_adjacent.into_iter() {
@@ -558,9 +579,74 @@ impl NariMesh {
                         subsegment_clusters.push(holding_set.clone());
                         holding_set.clear();
                     }
-                    holding_set.insert((point, prev_point));
+                    holding_set.insert((point, point_start));
                     prev_angle = angle;
-                    prev_point = point;
+                }
+                if !holding_set.is_empty() {
+                    subsegment_clusters.push(holding_set);
+                }
+            }
+            None => {}
+        }
+
+        // go down p2
+        match self.point_relations.get(&edge.end()) {
+            Some(tris) => {
+                let mut points_adjacent = tris
+                    .iter()
+                    .filter_map(|tri| {
+                        if let Some(triangle) = self.triangles.get_by_index(tri) {
+                            Some(
+                                triangle
+                                    .edges()
+                                    .into_iter()
+                                    .filter_map(|edge| {
+                                        if edge.start() == point_ref_start
+                                            || edge.end() == point_ref_start
+                                        {
+                                            Some(edge)
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                    .collect::<Vec<Edge>>(),
+                            )
+                        } else {
+                            None
+                        }
+                    })
+                    .flatten()
+                    .filter_map(|edge| {
+                        if edge.start() != point_ref_start {
+                            Some(match self.points.get_by_index(&edge.start()) {
+                                Some(pt) => *pt,
+                                None => return None,
+                            })
+                        } else if edge.end() != point_ref_start {
+                            Some(match self.points.get_by_index(&edge.end()) {
+                                Some(pt) => *pt,
+                                None => return None,
+                            })
+                        } else {
+                            None
+                        }
+                    })
+                    .map(|pt| (pt, point_end.angle_of_3(&point_start, &pt)))
+                    .collect::<Vec<(Point2d, Angle)>>();
+
+                points_adjacent.sort_by(|prev, next| prev.1.cmp(&next.1));
+
+                let sixty_degrees = Angle::from_degrees(60_f32);
+                let mut prev_angle = Angle::new(0_f32);
+                let mut holding_set = HashSet::new();
+
+                for (point, angle) in points_adjacent.into_iter() {
+                    if (angle - prev_angle) > sixty_degrees {
+                        subsegment_clusters.push(holding_set.clone());
+                        holding_set.clear();
+                    }
+                    holding_set.insert((point, point_end));
+                    prev_angle = angle;
                 }
                 if !holding_set.is_empty() {
                     subsegment_clusters.push(holding_set);
@@ -574,25 +660,35 @@ impl NariMesh {
         }
 
         let cluster = match subsegment_clusters.get(0) {
-            Some(c) => c,
+            Some(c) => {
+                let c = c.clone();
+                TwoElemMoveOnceVec::from(c.into_iter())
+            }
             None => {
                 return false;
             }
         };
 
-        let exists_shortest = false;
-        let this_edge_distance = point_start.distance_to(point_end);
+        let this_edge_distance = point_start.distance_to(&point_end);
+        let mut separation_angles = Vec::with_capacity(cluster.len());
 
-        for (p1, p2) in cluster {
+        for (p1, p2) in cluster.iter() {
             let edge_dist = p1.distance_to(p2);
             if edge_dist < this_edge_distance {
                 return true;
             }
         }
 
+        for (e1, e2) in cluster {
+            separation_angles.push(e1.1.angle_of_3(&e1.0, &e2.0))
+        }
 
+        separation_angles.sort();
 
-        false
+        let r_min = this_edge_distance.abs()
+            * (separation_angles.get(0).unwrap_or(&Angle::new(0 as f32)) / 2_f32).sin();
+
+        return r_min >= length;
     }
 
     fn insert_circumcenter_with_radius(
@@ -634,7 +730,7 @@ impl NariMesh {
                         None => continue,
                     };
 
-                    // ONLY re-intorduce the circle if its centroid is within  the radius
+                    // ONLY re-introduce the circle if its centroid is within  the radius
                     let centroid = triangle_centroid(p1, p2, p3);
 
                     if centroid.distance_to(&circumcenter) < radius {
