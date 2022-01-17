@@ -2,6 +2,7 @@
 #![warn(clippy::all)]
 #![feature(portable_simd)]
 #![feature(map_first_last)]
+#![feature(total_cmp)]
 
 #[cfg(feature = "serde_impl")]
 #[macro_use]

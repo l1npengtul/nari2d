@@ -198,43 +198,45 @@ impl NariMesh {
     pub fn insert_point(&mut self, point: Point2d) -> NResult<()> {
         // check if outside or inside hull
         let hull = self.hull_points();
-        if point.point_in_polygon(&hull) {
-            // boiler wattson go!
-            let mut bad_triangles = Vec::with_capacity(6);
-
-            // use triangle connectivity to find all the triangles that might contain this point
-            // 6 should be enough (?)
-            self.points
-                .nearest_neighbor_iter(&point)
-                .take(6)
-                .filter_map(|point| self.points.get_by_value(point))
-                .filter_map(|p_ref| self.point_relations.get(p_ref))
-                .flatten()
-                .unique()
-                .filter_map(|tri_ref| Some((*tri_ref, *(self.triangles.get_by_index(tri_ref)?))))
-                .filter_map(|(index, triangle)| {
-                    let mut points: StaticVec<Point2d, 3> = StaticVec::new();
-                    for pt in triangle.points() {
-                        match self.points.get_by_index(&pt) {
-                            Some(p) => {
-                                points.push(*p);
-                            }
-                            None => {
-                                return None;
-                            }
-                        }
-                    }
-                    Some((index, (points[0], points[1], points[2])))
-                })
-                .for_each(|(i, (p1, p2, p3))| {});
-        }
+        if point.point_in_polygon(&hull) {}
         Ok(())
     }
 
     pub fn insert_points(&mut self, point: impl IntoIterator<Item = Point2d>) -> NResult<()> {}
 
     // ONLY VALID IF INSIDE POLYGON!
-    fn ipt_boiler_wattson(&mut self, point: Point2d) {}
+    fn ipt_boiler_wattson(&mut self, point: Point2d) -> NResult<()> {
+        // boiler wattson go!
+        let mut bad_triangles = Vec::with_capacity(6);
+
+        // use triangle connectivity to find all the triangles that might contain this point
+        // 6 should be enough (?)
+        self.points
+            .nearest_neighbor_iter(&point)
+            .take(6)
+            .filter_map(|point| self.points.get_by_value(point))
+            .filter_map(|p_ref| self.point_relations.get(p_ref))
+            .flatten()
+            .unique()
+            .filter_map(|tri_ref| Some((*tri_ref, *(self.triangles.get_by_index(tri_ref)?))))
+            .filter_map(|(index, triangle)| {
+                let mut points: StaticVec<Point2d, 3> = StaticVec::new();
+                for pt in triangle.points() {
+                    match self.points.get_by_index(&pt) {
+                        Some(p) => {
+                            points.push(*p);
+                        }
+                        None => {
+                            return None;
+                        }
+                    }
+                }
+                Some((index, (points[0], points[1], points[2])))
+            })
+            .for_each(|(i, (p1, p2, p3))| point.point_in_circle(&p1, &p2, &p3));
+
+        Ok(())
+    }
 
     fn ipt_outside(&mut self, point: Point2d) {}
 
@@ -854,7 +856,7 @@ impl NariMesh {
             let p1 = match self.points.get_by_index(&triangle.p1()) {
                 Some(p) => {
                     if !no_remove_point.contains(&triangle.p1())
-                        || !p.point_on_circle(&circumcenter, radius, false)
+                        || !p.point_in_circle(&circumcenter, radius, false)
                     {
                         if let Some(t_set) = self.point_relations.get_mut(&tri_ref) {
                             t_set.remove(&triangle.p1());
@@ -870,7 +872,7 @@ impl NariMesh {
             let p2 = match self.points.get_by_index(&triangle.p2()) {
                 Some(p) => {
                     if !no_remove_point.contains(&triangle.p2())
-                        || !p.point_on_circle(&circumcenter, radius, false)
+                        || !p.point_in_circle(&circumcenter, radius, false)
                     {
                         if let Some(t_set) = self.point_relations.get_mut(&tri_ref) {
                             t_set.remove(&triangle.p2());
@@ -886,7 +888,7 @@ impl NariMesh {
             let p3 = match self.points.get_by_index(&triangle.p3()) {
                 Some(p) => {
                     if !no_remove_point.contains(&triangle.p3())
-                        || !p.point_on_circle(&circumcenter, radius, false)
+                        || !p.point_in_circle(&circumcenter, radius, false)
                     {
                         if let Some(t_set) = self.point_relations.get_mut(&tri_ref) {
                             t_set.remove(&triangle.p3());

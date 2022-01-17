@@ -2,8 +2,10 @@ use crate::geometry::{
     float_cmp, lattice::StrengthPoint, nearly_equal_f32, Angle, IndexedPoint2d, Orientation,
     PointSlice, PointVec, PreCalcConstsSlice, PreCalcMultiplesSlice, Scale2d,
 };
+use core::simd::Simd;
 use robust::Coord;
 use rstar::{Envelope, Point, RTreeObject, AABB};
+use staticvec::staticvec;
 use std::{
     cmp::Ordering,
     fmt::{Display, Formatter},
@@ -375,7 +377,7 @@ impl Point2d {
 
     #[inline]
     #[must_use]
-    pub fn point_on_circle(&self, center: &Point2d, radius: f32, include_on_circle: bool) -> bool {
+    pub fn point_in_circle(&self, center: &Point2d, radius: f32, include_on_circle: bool) -> bool {
         let dx = f32::abs(self.x - center.x);
         let dy = f32::abs(self.y - center.y);
 
@@ -397,9 +399,31 @@ impl Point2d {
     #[inline]
     #[must_use]
     pub fn point_in_circumcircle(&self, p1: &Point2d, p2: &Point2d, p3: &Point2d) -> bool {
-        let point_average = (p1 + p2 + p3) / 3_f32;
-        let point_below_average = Point2d::new(point_average.x(), point_average.y() - 10_f32);
-        // todog
+        let mut points = staticvec![p1, p2, p3];
+        points.sort_by(|a, b| match a.y().total_cmp(&b.y()) {
+            Ordering::Greater => Ordering::Greater,
+            Ordering::Equal => a.x().total_cmp(&b.x()),
+            Ordering::Less => Ordering::Less,
+        });
+        let a = unsafe { points.pop_unchecked() };
+
+        let b = if points[0].x < points[1].x {
+            unsafe { points.pop_unchecked() }
+        } else {
+            points[1]
+        };
+
+        let c = unsafe { points.pop_unchecked() };
+
+        // x value vec
+        // ax, bx, cx
+        let x_values: Simd<f32, 4> = Simd::from_array([a.x, b.x, c.x, 1]);
+        let x_values = x_values - Simd::splat(self.x);
+        let x_values = x_values.as_array();
+        let y_values: Simd<f32, 4> = Simd::from_array([a.y, b.y, c.y, 1]);
+        let y_values = y_values - Simd::splat(self.y);
+
+        false
     }
 }
 
