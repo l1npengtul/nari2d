@@ -9,12 +9,13 @@ use crate::{
         mesh::{
             area, concave_hull, find_power_of_2_splitting, is_edge_encroached, is_subsegment,
             line_intersect_circle, segment_intersects, triangle_centroid, triangle_circumcenter,
-            Edge, PointRef, Triangle, TriangleRef,
+            Edge, EdgeRef, PointRef, Triangle, TriangleRef,
         },
         Angle, Point2d,
     },
 };
 use ahash::RandomState;
+use itertools::Itertools;
 use rstar::RTree;
 use staticvec::{staticvec, StaticVec};
 use std::{
@@ -41,6 +42,48 @@ impl NariMesh {
         points.sort();
         points.dedup();
 
+        let mut mesh = NariMesh {
+            points: points.into(),
+            triangles: Default::default(),
+            edges: Default::default(),
+            point_relations: Default::default(),
+            unit: 0.0,
+        };
+
+        mesh.triangulate()?;
+
+        Ok(mesh)
+    }
+
+    pub fn points_iter<'a>(&self) -> Values<'a, PointRef, Point2d> {
+        self.points.values()
+    }
+
+    pub fn points_len(&self) -> usize {
+        self.points.len()
+    }
+
+    pub fn triangle_iter<'a>(&self) -> Values<'a, TriangleRef, Triangle> {
+        self.triangles.values()
+    }
+
+    pub fn triangles_len(&self) -> usize {
+        self.triangles.len()
+    }
+
+    pub fn mesh_area(&self) -> Option<f64> {
+        let mut total_area = 0_f64;
+        for triangle in self.triangle_iter() {
+            let point1 = self.points.get_by_index(&triangle.p1())?;
+            let point2 = self.points.get_by_index(&triangle.p2())?;
+            let point3 = self.points.get_by_index(&triangle.p3())?;
+            total_area += area(point1, point2, point3);
+        }
+        Some(total_area)
+    }
+
+    pub fn triangulate(&mut self) -> NResult<()> {
+        let points = self.points.values().map(|x| *x).collect::<Vec<_>>();
         let concave_hull = concave_hull(&points, 3)?;
 
         let mut input_edges = TwoElemMoveOnceVec::from(concave_hull.into_iter())
@@ -114,41 +157,90 @@ impl NariMesh {
 
         let points = points.into();
 
-        Ok(NariMesh {
-            points,
-            triangles,
-            point_relations,
-            edges,
-            unit,
-        })
+        self.unit = unit;
+        self.triangles = triangles;
+        self.points = points;
+        self.point_relations = point_relations;
+        self.edges = edges;
+
+        Ok(())
     }
 
-    pub fn points_iter<'a>(&self) -> Values<'a, PointRef, Point2d> {
-        self.points.values()
+    pub fn hull_edges(&self) -> Vec<Edge> {
+        self.edges
+            .iter()
+            .filter_map(|(e, s)| return if s { Some(*e) } else { None })
+            .collect()
     }
 
-    pub fn points_len(&self) -> usize {
-        self.points.len()
+    pub fn hull_points(&self) -> Vec<Point2d> {
+        self.hull_edges()
+            .into_iter()
+            .map(|e| (e.start(), e.end()))
+            .filter_map(|(start, end)| {
+                let a = match self.points.get_by_index(&start) {
+                    Some(p) => p,
+                    None => return None,
+                };
+                let b = match self.points.get_by_index(&end) {
+                    Some(p) => p,
+                    None => return None,
+                };
+                Some([a, b])
+            })
+            .flat_map(|x| *x)
+            .unique()
+            .collect()
     }
 
-    pub fn triangle_iter<'a>(&self) -> Values<'a, TriangleRef, Triangle> {
-        self.triangles.values()
-    }
+    // All these use a modified version of Bowyer Watson. https://en.wikipedia.org/wiki/Bowyer%E2%80%93Watson_algorithm
+    // wattson in boiler in de_inferno what will she do
+    pub fn insert_point(&mut self, point: Point2d) -> NResult<()> {
+        // check if outside or inside hull
+        let hull = self.hull_points();
+        if point.point_in_polygon(&hull) {
+            // boiler wattson go!
+            let mut bad_triangles = Vec::with_capacity(6);
 
-    pub fn triangles_len(&self) -> usize {
-        self.triangles.len()
-    }
-
-    pub fn mesh_area(&self) -> Option<f64> {
-        let mut total_area = 0_f64;
-        for triangle in self.triangle_iter() {
-            let point1 = self.points.get_by_index(&triangle.p1())?;
-            let point2 = self.points.get_by_index(&triangle.p2())?;
-            let point3 = self.points.get_by_index(&triangle.p3())?;
-            total_area += area(point1, point2, point3);
+            // use triangle connectivity to find all the triangles that might contain this point
+            // 6 should be enough (?)
+            self.points
+                .nearest_neighbor_iter(&point)
+                .take(6)
+                .filter_map(|point| self.points.get_by_value(point))
+                .filter_map(|p_ref| self.point_relations.get(p_ref))
+                .flatten()
+                .unique()
+                .filter_map(|tri_ref| Some((*tri_ref, *(self.triangles.get_by_index(tri_ref)?))))
+                .filter_map(|(index, triangle)| {
+                    let mut points: StaticVec<Point2d, 3> = StaticVec::new();
+                    for pt in triangle.points() {
+                        match self.points.get_by_index(&pt) {
+                            Some(p) => {
+                                points.push(*p);
+                            }
+                            None => {
+                                return None;
+                            }
+                        }
+                    }
+                    Some((index, (points[0], points[1], points[2])))
+                })
+                .for_each(|(i, (p1, p2, p3))| {});
         }
-        Some(total_area)
+        Ok(())
     }
+
+    pub fn insert_points(&mut self, point: impl IntoIterator<Item = Point2d>) -> NResult<()> {}
+
+    // ONLY VALID IF INSIDE POLYGON!
+    fn ipt_boiler_wattson(&mut self, point: Point2d) {}
+
+    fn ipt_outside(&mut self, point: Point2d) {}
+
+    pub fn remove_point(&mut self, point: Point2d) -> NResult<Point2d> {}
+
+    pub fn remove_points(&mut self, point: impl IntoIterator<Item = Point2d>) -> NResult<()> {}
 
     pub fn edge_refs(&self, edge: &Edge) -> Option<StaticVec<TriangleRef, 2>> {
         let start_point_tri_ref = self.point_relations.get(&edge.start())?;

@@ -393,6 +393,14 @@ impl Point2d {
             dx.powi(2) + dy.powi(2) < radius.powi(2)
         };
     }
+
+    #[inline]
+    #[must_use]
+    pub fn point_in_circumcircle(&self, p1: &Point2d, p2: &Point2d, p3: &Point2d) -> bool {
+        let point_average = (p1 + p2 + p3) / 3_f32;
+        let point_below_average = Point2d::new(point_average.x(), point_average.y() - 10_f32);
+        // todog
+    }
 }
 
 impl Add for Point2d {
