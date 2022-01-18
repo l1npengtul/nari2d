@@ -233,7 +233,21 @@ impl NariMesh {
                 }
                 Some((index, (points[0], points[1], points[2])))
             })
-            .for_each(|(i, (p1, p2, p3))| point.point_in_circle(&p1, &p2, &p3));
+            .for_each(|(i, (p1, p2, p3))| {
+                if point.point_in_circumcircle(&p1, &p2, &p3) {
+                    bad_triangles.push(i);
+                }
+            });
+
+        let mut polygon = Vec::with_capacity(10);
+
+        for tri_ref in bad_triangles {
+            if let Some(triangle) = self.triangles.get_by_index(&tri_ref) {
+                for edge in triangle.edges() {
+                    if let Some(relations) = self.edge_refs(&edge) {}
+                }
+            }
+        }
 
         Ok(())
     }

@@ -2,7 +2,6 @@ use crate::geometry::{
     float_cmp, lattice::StrengthPoint, nearly_equal_f32, Angle, IndexedPoint2d, Orientation,
     PointSlice, PointVec, PreCalcConstsSlice, PreCalcMultiplesSlice, Scale2d,
 };
-use core::simd::Simd;
 use robust::Coord;
 use rstar::{Envelope, Point, RTreeObject, AABB};
 use staticvec::staticvec;
@@ -12,6 +11,7 @@ use std::{
     hash::{Hash, Hasher},
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Rem, RemAssign, Sub, SubAssign},
 };
+use wide::f32x4;
 
 #[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Default, Debug)]
@@ -415,15 +415,17 @@ impl Point2d {
 
         let c = unsafe { points.pop_unchecked() };
 
-        // x value vec
-        // ax, bx, cx
-        let x_values: Simd<f32, 4> = Simd::from_array([a.x, b.x, c.x, 1]);
-        let x_values = x_values - Simd::splat(self.x);
-        let x_values = x_values.as_array();
-        let y_values: Simd<f32, 4> = Simd::from_array([a.y, b.y, c.y, 1]);
-        let y_values = y_values - Simd::splat(self.y);
+        let ax = a.x - self.x;
+        let ay = a.y - self.y;
+        let bx = b.x - self.x;
+        let by = b.y - self.y;
+        let cx = c.x - self.x;
+        let cy = c.y - self.y;
 
-        false
+        return ((ax.powi(2) + ay.powi(2)) * (bx * cy - cx * by)
+            - (bx.powi(2) + by.powi(2)) * (ax * cy - cx * ay)
+            + (cx.powi(2) + cy.powi(2)) * (ax * by - bx * ay))
+            > 0_f32;
     }
 }
 
