@@ -193,6 +193,23 @@ impl NariMesh {
             .collect()
     }
 
+    pub fn edge_refs(&self, edge: &Edge) -> Option<StaticVec<TriangleRef, 2>> {
+        let start_point_tri_ref = self.point_relations.get(&edge.start())?;
+        let end_point_tri_ref = self.point_relations.get(&edge.end())?;
+        let mut intersection = start_point_tri_ref.intersection(end_point_tri_ref);
+        let mut tri_refs: StaticVec<TriangleRef, 2> = StaticVec::new();
+
+        match intersection.nth(0) {
+            Some(i) => tri_refs.push(*i),
+            None => {}
+        }
+        match intersection.nth(0) {
+            Some(i) => tri_refs.push(*i),
+            None => {}
+        }
+        Some(tri_refs)
+    }
+
     // All these use a modified version of Bowyer Watson. https://en.wikipedia.org/wiki/Bowyer%E2%80%93Watson_algorithm
     // wattson in boiler in de_inferno what will she do
     pub fn insert_point(&mut self, point: Point2d) -> NResult<()> {
@@ -207,11 +224,11 @@ impl NariMesh {
     // ONLY VALID IF INSIDE POLYGON!
     fn ipt_boiler_wattson(&mut self, point: Point2d) -> NResult<()> {
         // boiler wattson go!
-        let mut bad_triangles = Vec::with_capacity(6);
 
         // use triangle connectivity to find all the triangles that might contain this point
         // 6 should be enough (?)
-        self.points
+        let mut bad_triangles = self
+            .points
             .nearest_neighbor_iter(&point)
             .take(6)
             .filter_map(|point| self.points.get_by_value(point))
@@ -233,18 +250,35 @@ impl NariMesh {
                 }
                 Some((index, (points[0], points[1], points[2])))
             })
-            .for_each(|(i, (p1, p2, p3))| {
+            .filter_map(|(i, (p1, p2, p3))| {
                 if point.point_in_circumcircle(&p1, &p2, &p3) {
-                    bad_triangles.push(i);
+                    Some(i)
                 }
-            });
+                None
+            })
+            .collect::<BTreeSet<TriangleRef>>();
 
-        let mut polygon = Vec::with_capacity(10);
+        let mut polygon = BTreeSet::new();
+        let mut bad_edges = BTreeSet::new();
 
         for tri_ref in bad_triangles {
             if let Some(triangle) = self.triangles.get_by_index(&tri_ref) {
                 for edge in triangle.edges() {
-                    if let Some(relations) = self.edge_refs(&edge) {}
+                    let mut not_part = false;
+                    if let Some(relations) = self.edge_refs(&edge) {
+                        let a = relations.get(0).unwrap_or(&u32::MAX as &TriangleRef);
+                        let b = relations.get(1).unwrap_or(&u32::MAX as &TriangleRef);
+
+                        if !bad_triangles.contains(a) && !bad_triangles.contains(b) {
+                            not_part = true;
+                        }
+                    }
+
+                    if not_part {
+                        polygon.insert(edge);
+                    } else {
+                        bad_edges(edge);
+                    }
                 }
             }
         }
@@ -258,21 +292,15 @@ impl NariMesh {
 
     pub fn remove_points(&mut self, point: impl IntoIterator<Item = Point2d>) -> NResult<()> {}
 
-    pub fn edge_refs(&self, edge: &Edge) -> Option<StaticVec<TriangleRef, 2>> {
-        let start_point_tri_ref = self.point_relations.get(&edge.start())?;
-        let end_point_tri_ref = self.point_relations.get(&edge.end())?;
-        let mut intersection = start_point_tri_ref.intersection(end_point_tri_ref);
-        let mut tri_refs: StaticVec<TriangleRef, 2> = StaticVec::new();
+    pub fn remove_triangle_raw(&mut self, t_ref: TriangleRef) -> Option<Triangle> {
+        match self.triangles.get_by_index(&t_ref) {
+            Some(tri) => {
+                // remove relations
 
-        match intersection.nth(0) {
-            Some(i) => tri_refs.push(*i),
-            None => {}
+                // remove points
+            }
+            None => None,
         }
-        match intersection.nth(0) {
-            Some(i) => tri_refs.push(*i),
-            None => {}
-        }
-        Some(tri_refs)
     }
 
     pub fn insert_triangle_raw(&mut self, triangle: Triangle) -> TriangleRef {
