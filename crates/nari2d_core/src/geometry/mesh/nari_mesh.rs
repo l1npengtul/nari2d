@@ -18,6 +18,7 @@ use ahash::RandomState;
 use itertools::Itertools;
 use rstar::RTree;
 use staticvec::{staticvec, StaticVec};
+use std::collections::hash_map::Keys;
 use std::{
     collections::{hash_set::IntoIter, BTreeMap, BTreeSet, HashMap, HashSet},
     ops::Index,
@@ -61,6 +62,14 @@ impl NariMesh {
 
     pub fn points_len(&self) -> usize {
         self.points.len()
+    }
+
+    pub fn edges_len(&self) -> usize {
+        self.edges.len()
+    }
+
+    pub fn edges_iter<'a>(&self) -> Keys<'a, Edge, bool> {
+        self.edges.keys().into_iter()
     }
 
     pub fn triangle_iter<'a>(&self) -> Values<'a, TriangleRef, Triangle> {
@@ -173,6 +182,10 @@ impl NariMesh {
             .collect()
     }
 
+    pub fn is_hull_edge(&self, edge: &Edge) -> bool {
+        *(self.edges.get(edge).unwrap_or(&false))
+    }
+
     pub fn hull_points(&self) -> Vec<Point2d> {
         self.hull_edges()
             .into_iter()
@@ -193,7 +206,16 @@ impl NariMesh {
             .collect()
     }
 
-    pub fn edge_refs(&self, edge: &Edge) -> Option<StaticVec<TriangleRef, 2>> {
+    pub fn is_hull_point(&self, point: &PointRef) -> bool {
+        for edge in self.hull_edges() {
+            if &edge.start() == point || &edge.end() == point {
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn edge_triangles(&self, edge: &Edge) -> Option<StaticVec<TriangleRef, 2>> {
         let start_point_tri_ref = self.point_relations.get(&edge.start())?;
         let end_point_tri_ref = self.point_relations.get(&edge.end())?;
         let mut intersection = start_point_tri_ref.intersection(end_point_tri_ref);
@@ -208,6 +230,54 @@ impl NariMesh {
             None => {}
         }
         Some(tri_refs)
+    }
+
+    pub fn triangle_neighbours(
+        &self,
+        triangle_ref: &TriangleRef,
+    ) -> Option<StaticVec<(Edge, TriangleRef), 3>> {
+        match self.triangles.get_by_index(triangle_ref) {
+            Some(tri) => Some(
+                tri.edges()
+                    .into_iter()
+                    .filter_map(|edge| {
+                        let b = self.edge_refs(&edge)?;
+                        Some((edge, b))
+                    })
+                    .filter_map(|(e, refs)| {
+                        let mut refs = refs;
+                        if refs.get(0) == Some(triangle_ref) {
+                            refs.remove(0);
+                        } else if refs.get(1) == Some(triangle_ref) {
+                            refs.remove(1);
+                        }
+
+                        if refs.len() != 1 {
+                            return None;
+                        }
+                        Some((e, refs[0]))
+                    })
+                    .take(3)
+                    .collect::<StaticVec<(Edge, TriangleRef), 3>>(),
+            ),
+            None => None,
+        }
+    }
+
+    pub fn point(&self, point_ref: &PointRef) -> Option<&Point2d> {
+        self.points.get_by_index(point_ref)
+    }
+
+    pub fn point_reference(&self, point: &Point2d) -> Option<&PointRef> {
+        self.points.get_by_value(point)
+    }
+
+    pub fn triangle(&self, triangle_ref: &TriangleRef) -> Option<&Triangle> {
+        self.triangles.get_by_index(triangle_ref)
+    }
+
+    pub fn triangle_reference(&self, triangle: &Triangle) -> Option<&TriangleRef> {
+        self.triangles.get_by_value(triangle)
     }
 
     // All these use a modified version of Bowyer Watson. https://en.wikipedia.org/wiki/Bowyer%E2%80%93Watson_algorithm
@@ -277,7 +347,7 @@ impl NariMesh {
                     if not_part {
                         polygon.insert(edge);
                     } else {
-                        bad_edges(edge);
+                        bad_edges.insert(edge);
                     }
                 }
             }
@@ -287,21 +357,6 @@ impl NariMesh {
     }
 
     fn ipt_outside(&mut self, point: Point2d) {}
-
-    pub fn remove_point(&mut self, point: Point2d) -> NResult<Point2d> {}
-
-    pub fn remove_points(&mut self, point: impl IntoIterator<Item = Point2d>) -> NResult<()> {}
-
-    pub fn remove_triangle_raw(&mut self, t_ref: TriangleRef) -> Option<Triangle> {
-        match self.triangles.get_by_index(&t_ref) {
-            Some(tri) => {
-                // remove relations
-
-                // remove points
-            }
-            None => None,
-        }
-    }
 
     pub fn insert_triangle_raw(&mut self, triangle: Triangle) -> TriangleRef {
         let triangle_ref = self.triangles.insert(triangle).0 as TriangleRef;
@@ -327,6 +382,30 @@ impl NariMesh {
 
         triangle_ref
     }
+
+    pub fn remove_point(&mut self, point: Point2d) -> NResult<Point2d> {}
+
+    pub fn remove_points(&mut self, point: impl IntoIterator<Item = Point2d>) -> NResult<()> {}
+
+    pub fn remove_triangle_raw(&mut self, t_ref: &TriangleRef) -> Option<Triangle> {
+        match self.triangles.get_by_index(t_ref) {
+            Some(tri) => {
+                // remove relations
+                for point_ref in tri.points() {
+                    if let Some(relation) = self.point_relations.get_mut(&point_ref) {
+                        relation.remove(t_ref);
+                    }
+                }
+                // remove triangle
+                self.triangles.remove_by_index(t_ref);
+                // return
+                Some(*tri)
+            }
+            None => None,
+        }
+    }
+
+    pub fn remove_edge_raw(&mut self, edge_ref: &EdgeRef) -> Option<Edge> {}
 
     pub fn split_edge_across(&mut self, edge: &Edge, along: f32) -> NResult<([Edge; 2], PointRef)> {
         let edge_start = match self.points.get_by_index(&edge.start()) {
@@ -358,7 +437,7 @@ impl NariMesh {
         let mut non_edge_points: StaticVec<u32, 2> = StaticVec::new();
 
         for t_ref in previous_triangles {
-            if let Some((_, triangle)) = self.triangles.remove_by_index(t_ref) {
+            if let Some((_, triangle)) = self.triangles.remove_by_index(&t_ref) {
                 let non_edge = triangle.non_edge_point(edge)?;
                 non_edge_points.push(non_edge);
             }

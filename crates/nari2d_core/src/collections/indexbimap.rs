@@ -85,8 +85,8 @@ where
         }
     }
 
-    pub fn remove_by_index(&mut self, index: I) -> Option<(I, V)> {
-        match self.internal.remove_by_left(&index) {
+    pub fn remove_by_index(&mut self, index: &I) -> Option<(I, V)> {
+        match self.internal.remove_by_left(index) {
             Some(p) => {
                 self.free_indices.insert(p.0);
                 Some(p)
@@ -95,8 +95,8 @@ where
         }
     }
 
-    pub fn remove_by_value(&mut self, value: V) -> Option<(I, V)> {
-        match self.internal.remove_by_right(&value) {
+    pub fn remove_by_value(&mut self, value: &V) -> Option<(I, V)> {
+        match self.internal.remove_by_right(value) {
             Some(p) => {
                 self.free_indices.insert(p.0);
                 Some(p)

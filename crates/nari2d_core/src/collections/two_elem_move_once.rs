@@ -75,6 +75,9 @@ impl<T> Into<Vec<T>> for TwoElemMoveOnceVec<T> {
     }
 }
 
+// The performance here is not the best. Actually, it probably is terrible.
+// This probably does not allow for proper vectorization.
+// If anyone knows a better way please make an issue/pr.
 impl<'a, T> Iterator for TwoElemMoveOnceVec<T> {
     type Item = (&'a T, &'a T);
 
