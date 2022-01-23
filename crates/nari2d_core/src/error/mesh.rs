@@ -19,13 +19,15 @@ pub enum MeshError {
         idx: IndexOrValue<IndexType, Point2d>,
     },
     #[error("Edge not found at {idx}")]
-    EdgeNotFound { idx: IndexOrValue<IndexType, Edge> },
+    EdgeNotFound { edge: Edge },
     #[error("Point not found at {idx}")]
     TriangleNotFound {
         idx: IndexOrValue<TriangleRef, Triangle>,
     },
     #[error("Non Edge Operation on Triangle {triangle} with improper edge {edge}.")]
     NonEdgeImproperEdge { triangle: Triangle, edge: Edge },
+    #[error("Could not calculate concave hull: {why}")]
+    ConcaveError { why: String },
 }
 
 pub type MResult<T> = Result<T, MeshError>;

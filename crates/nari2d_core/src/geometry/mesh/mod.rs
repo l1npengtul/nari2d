@@ -1,8 +1,8 @@
 use crate::{
-    error::{NResult, Nari2DError},
+    collections::point_store::PointStore,
+    error::mesh::{MResult, MeshError},
     geometry::{Angle, IndexedPoint2d, Orientation, Point2d},
 };
-use rstar::RTree;
 use std::{cmp::Ordering, ops::Add};
 
 mod indices;
@@ -12,41 +12,30 @@ pub use indices::*;
 pub use nari_mesh::NariMesh;
 
 // algorithm from https://www.researchgate.net/publication/220868874_Concave_hull_A_k-nearest_neighbours_approach_for_the_computation_of_the_region_occupied_by_a_set_of_points
-pub fn concave_hull(points: &[Point2d], point_include: usize) -> NResult<Vec<usize>> {
+pub fn concave_hull(
+    points: impl IntoIterator<Item = Point2d>,
+    point_include: usize,
+) -> MResult<Vec<usize>> {
     let mut point_include = usize::max(point_include, 3_usize);
     if points.len() > 3 {
-        return Err(Nari2DError::MeshConcaveCalculation {
-            points: points.to_vec(),
-            error: "Points < 3".to_string(),
+        return Err(MeshError::ConcaveError {
+            why: "> 3 Points".to_string(),
         });
     }
     if points.len() == 3 {
         Ok(vec![0, 1, 2])
     }
 
-    let mut points = points;
-    points.sort();
-    points.dedup();
-    let mut points = points
-        .into_iter()
-        .enumerate()
-        .map(|(index, point)| IndexedPoint2d {
-            index,
-            point: *point,
-        })
-        .collect::<Vec<IndexedPoint2d>>();
-
-    let mut rtree = RTree::bulk_load(points.clone());
+    let mut point_store: PointStore<PointRef, Point2d> = PointStore::from(points);
     // get lowest y by getting the point closest to f32::MIN
-    let mut first_point = match rtree.nearest_neighbor(&[0_f32, f32::MIN]) {
+    let mut first_point = match point_store.nearest_neighbor(&Point2d::new(0_f32, f32::MIN)) {
         Some(pt) => {
-            rtree.remove(pt);
+            point_store.remove_by_value(*pt);
             *pt
         }
         None => {
-            return Err(Nari2DError::MeshConcaveCalculation {
-                points: points.into(),
-                error: "No lowest point!".to_string(),
+            return Err(MeshError::ConcaveError {
+                why: "Lowest Point Not Found".to_string(),
             })
         }
     };
@@ -58,9 +47,9 @@ pub fn concave_hull(points: &[Point2d], point_include: usize) -> NResult<Vec<usi
     let mut hull = Vec::with_capacity(points.len() / 2);
     hull.push(first_point);
 
-    while (current_point != step || step == 2) && rtree.size() > 0 {
+    while (current_point != first_point || step == 2) && point_store.size() > 0 {
         if step == 5 {
-            rtree.insert(first_point);
+            point_store.insert(first_point);
         }
 
         let mut k_nearest_points_iter = rtree
@@ -113,19 +102,19 @@ pub fn concave_hull(points: &[Point2d], point_include: usize) -> NResult<Vec<usi
         hull.push(current_point);
         previous_angle =
             Point2d::new(0_f32, 0_f32).angle_of_3(&hull[step].point, &hull[step - 1].point);
-        rtree.remove(&current_point);
+        point_store.remove_by_value(current_point);
         step += 1;
     }
 
     let mut all_inside = true;
-    for point in rtree.iter() {
+    for point in point_store.iter() {
         if !(point.point_in_polygon(&hull.into())) {
             all_inside = false;
             break;
         }
     }
     if all_inside == false {
-        return concave_hull(points.into(), point_include + 1);
+        return concave_hull(points.into_iter(), point_include + 1);
     }
 
     return Ok(hull.into());

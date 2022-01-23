@@ -1,3 +1,4 @@
+use crate::collections::two_elem_move_once::TwoElemMoveOnceVec;
 use crate::geometry::{
     float_cmp, lattice::StrengthPoint, nearly_equal_f32, Angle, IndexedPoint2d, Orientation,
     PointSlice, PointVec, PreCalcConstsSlice, PreCalcMultiplesSlice, Scale2d,
@@ -339,14 +340,14 @@ impl Point2d {
     #[must_use]
     pub fn point_in_polygon(&self, polygon: &[Point2d]) -> bool {
         let mut odd_nodes = false;
-        for poly_points in PointSlice::from(polygon) {
-            if (poly_points[1].y < self.y && poly_points[0].y >= self.y
-                || poly_points[0].y < self.y && poly_points[1].y >= self.y)
-                && (poly_points[1].x <= self.x || poly_points[0].y <= self.x)
+        for poly_points in TwoElemMoveOnceVec::from(polygon.into_iter()) {
+            if (poly_points.1.y < self.y && poly_points.0.y >= self.y
+                || poly_point.0.y < self.y && poly_points.1.y >= self.y)
+                && (poly_points.1.x <= self.x || poly_points.0.y <= self.x)
             {
-                odd_nodes ^= (poly_points[1].x
-                    + (self.y - poly_points[1].y) / (poly_points[0].y - poly_points[1].y)
-                        * (poly_points[0].x - poly_points[1].x)
+                odd_nodes ^= (poly_points.1.x
+                    + (self.y - poly_points.1.y) / (poly_points.0.y - poly_points.1.y)
+                        * (poly_points.0.x - poly_points.1.x)
                     < self.x)
             }
         }
@@ -364,9 +365,9 @@ impl Point2d {
     ) -> bool {
         let mut odd_nodes = false;
 
-        for (idx, poly_points) in PointSlice::new(polygon).enumerate() {
-            if (poly_points[1].y < self.y && poly_points[0].y >= self.y)
-                || (poly_points[0].y < self.y && poly_points[1].y >= self.y)
+        for (idx, poly_points) in TwoElemMoveOnceVec::from(polygon.into_iter()).enumerate() {
+            if (poly_points.1.y < self.y && poly_points.0.y >= self.y)
+                || (poly_points.0.y < self.y && poly_points.1.y >= self.y)
             {
                 odd_nodes ^= (self.y * multiples[idx] + constants[idx] < self.x);
             }

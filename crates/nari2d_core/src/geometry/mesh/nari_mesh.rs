@@ -1,29 +1,29 @@
+use crate::error::Nari2DError;
 use crate::{
     collections::{
         indexbimap::{IndexBiMap, Values},
         point_store::PointStore,
         two_elem_move_once::TwoElemMoveOnceVec,
     },
-    error::{mesh::MeshError, util::IndexOrValue, NResult},
+    error::{
+        mesh::MeshError,
+        util::{IndexOrValue, IndexType},
+        NResult,
+    },
     geometry::{
         mesh::{
             area, concave_hull, find_power_of_2_splitting, is_edge_encroached, is_subsegment,
-            line_intersect_circle, segment_intersects, triangle_centroid, triangle_circumcenter,
-            Edge, EdgeRef, PointRef, Triangle, TriangleRef,
+            line_intersect_circle, triangle_centroid, triangle_circumcenter, Edge, PointRef,
+            Triangle, TriangleRef,
         },
         Angle, Point2d,
     },
 };
 use ahash::RandomState;
 use itertools::Itertools;
-use rstar::RTree;
 use staticvec::{staticvec, StaticVec};
-use std::collections::hash_map::Keys;
-use std::{
-    collections::{hash_set::IntoIter, BTreeMap, BTreeSet, HashMap, HashSet},
-    ops::Index,
-    rc::Rc,
-};
+use std::collections::{hash_map::Keys, BTreeSet, HashMap, HashSet};
+use std::f32::consts::E;
 
 // This is a similar mesh implementation to Triangle's Triangle based tri-mesh.
 #[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
@@ -95,19 +95,12 @@ impl NariMesh {
         let points = self.points.values().map(|x| *x).collect::<Vec<_>>();
         let concave_hull = concave_hull(&points, 3)?;
 
-        let mut input_edges = TwoElemMoveOnceVec::from(concave_hull.into_iter())
-            .map(|(start, end)| (*start, *end))
-            .collect::<Vec<(usize, usize)>>();
+        let mut input_edges = TwoElemMoveOnceVec::from(concave_hull.into_iter());
 
         // set the unit for the mesh that we will later use to figure out the concentric circles
         // determined by 0.04 * shortest_edge_length. Otherwise, it is set to 0.04
         let unit = input_edges
-            .iter()
-            .map(|e| {
-                let start = points[e.0];
-                let end = points[e.1];
-                0.5 * start.distance_to(&end)
-            })
+            .map(|(start, end)| 0.5 * points[*start].distance_to(points[end]))
             .min()
             .unwrap_or(0.5);
 
@@ -154,11 +147,9 @@ impl NariMesh {
                     points[sub_edge.start() as usize],
                     points[sub_edge.end() as usize],
                 );
-                for super_edge in input_edges.iter() {
-                    let super_point_edge = (
-                        points[super_edge.start() as usize],
-                        points[super_edge.end() as usize],
-                    );
+                for super_edge in input_edges {
+                    let super_point_edge =
+                        (points[super_edge.0 as usize], points[super_edge.1 as usize]);
                     edges.insert(sub_edge, is_subsegment(&super_point_edge, &sub_point_edge));
                 }
             }
@@ -172,6 +163,24 @@ impl NariMesh {
         self.point_relations = point_relations;
         self.edges = edges;
 
+        Ok(())
+    }
+
+    pub fn calculate_hull(&mut self) -> NResult<()> {
+        let points = self.points.values().map(|x| *x);
+        let hull = TwoElemMoveOnceVec::from(concave_hull(points, 3)?.into_iter())
+            .map(|(start, end)| Edge::new(start as u32, end as u32))
+            .collect::<Vec<Edge>>();
+
+        for edge in hull {
+            match self.edges.get(&edge) {
+                Some(_) => {
+                    // please tell me there is a better way to do this
+                    self.edges.insert(edge, true);
+                }
+                None => return Err(MeshError::EdgeNotFound { edge }.into()),
+            }
+        }
         Ok(())
     }
 
@@ -201,8 +210,9 @@ impl NariMesh {
                 };
                 Some([a, b])
             })
-            .flat_map(|x| *x)
             .unique()
+            .flatten()
+            .map(|x| *x)
             .collect()
     }
 
@@ -285,7 +295,10 @@ impl NariMesh {
     pub fn insert_point(&mut self, point: Point2d) -> NResult<()> {
         // check if outside or inside hull
         let hull = self.hull_points();
-        if point.point_in_polygon(&hull) {}
+        if point.point_in_polygon(&hull) {
+            self.ipt_boiler_wattson(point)?;
+        } else {
+        }
         Ok(())
     }
 
@@ -294,6 +307,8 @@ impl NariMesh {
     // ONLY VALID IF INSIDE POLYGON!
     fn ipt_boiler_wattson(&mut self, point: Point2d) -> NResult<()> {
         // boiler wattson go!
+
+        let point_ref = self.points.insert(point).0;
 
         // use triangle connectivity to find all the triangles that might contain this point
         // 6 should be enough (?)
@@ -353,26 +368,54 @@ impl NariMesh {
             }
         }
 
+        for edge in bad_edges {
+            self.remove_edge_raw(&edge);
+        }
+
+        for edge in polygon {
+            self.insert_triangle_raw(Triangle::new(edge.start(), edge.end(), point_ref))?;
+        }
+
         Ok(())
     }
 
-    fn ipt_outside(&mut self, point: Point2d) {}
+    // different algorithm to insert outside
+    fn ipt_outside(&mut self, point: Point2d) -> NResult<()> {
+        let closest_points = self
+            .points
+            .nearest_neighbor_iter(&point)
+            .take(2)
+            .collect_vec();
+        if closest_points.len() != 2 {
+            return Err(MeshError::Triangulation {
+                why: "Expected 2 Nearest Points".to_string(),
+            }
+            .into());
+        }
+    }
 
-    pub fn insert_triangle_raw(&mut self, triangle: Triangle) -> TriangleRef {
+    pub fn insert_triangle_raw(&mut self, triangle: Triangle) -> NResult<TriangleRef> {
         let triangle_ref = self.triangles.insert(triangle).0 as TriangleRef;
 
-        triangle.points().into_iter().for_each(|p_ref| {
-            match self.point_relations.get_mut(&p_ref) {
-                Some(tri_refs) => {
-                    tri_refs.insert(triangle_ref);
+        for point_ref in triangle.points() {
+            if self.points.get_by_index(&point_ref).is_some() {
+                match self.point_relations.get_mut(&point_ref) {
+                    Some(tri_refs) => {
+                        tri_refs.insert(triangle_ref);
+                    }
+                    None => {
+                        let mut tri_refs = HashSet::with_capacity_and_hasher(4, RandomState::new());
+                        tri_refs.insert(triangle_ref);
+                        self.point_relations.insert(point_ref, tri_refs);
+                    }
                 }
-                None => {
-                    let mut tri_refs = HashSet::with_capacity_and_hasher(4, RandomState::new());
-                    tri_refs.insert(triangle_ref);
-                    self.point_relations.insert(p_ref, tri_refs);
+            } else {
+                return Err(MeshError::PointNotFound {
+                    idx: IndexOrValue::Index(IndexType::U32(point_ref)),
                 }
+                .into());
             }
-        });
+        }
 
         triangle.edges().into_iter().for_each(|edge| {
             if let None = self.edges.get(&edge) {
@@ -380,7 +423,7 @@ impl NariMesh {
             }
         });
 
-        triangle_ref
+        Ok(triangle_ref)
     }
 
     pub fn remove_point(&mut self, point: Point2d) -> NResult<Point2d> {}
@@ -405,7 +448,24 @@ impl NariMesh {
         }
     }
 
-    pub fn remove_edge_raw(&mut self, edge_ref: &EdgeRef) -> Option<Edge> {}
+    pub fn remove_edge_raw(&mut self, edge: &Edge) -> Option<(StaticVec<TriangleRef, 2>, bool)> {
+        match self.edges.get(edge) {
+            Some(is_subsegment) => {
+                let is_subsegment = *is_subsegment;
+                self.edges.remove(edge);
+                match self.edge_triangles(edge) {
+                    Some(tris) => {
+                        for tri in tris {
+                            self.remove_triangle_raw(&tri);
+                        }
+                        Some((tris, is_subsegment))
+                    }
+                    None => None,
+                }
+            }
+            None => None,
+        }
+    }
 
     pub fn split_edge_across(&mut self, edge: &Edge, along: f32) -> NResult<([Edge; 2], PointRef)> {
         let edge_start = match self.points.get_by_index(&edge.start()) {
@@ -1040,7 +1100,7 @@ impl NariMesh {
                 *sp,
                 *ep,
                 splitting_point_ref,
-            )));
+            ))?);
         }
 
         (new_triangles, splitting_point_ref)
