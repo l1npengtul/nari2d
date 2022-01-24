@@ -384,14 +384,85 @@ impl NariMesh {
         let closest_points = self
             .points
             .nearest_neighbor_iter(&point)
-            .take(2)
+            .take(3)
             .collect_vec();
-        if closest_points.len() != 2 {
+        if closest_points.len() != 3 {
             return Err(MeshError::Triangulation {
                 why: "Expected 2 Nearest Points".to_string(),
             }
             .into());
         }
+        let p1_ref = match self.points.get_by_value(closest_points[0]) {
+            Some(p_ref) => *p_ref,
+            None => {
+                return Err(MeshError::PointNotFound {
+                    idx: IndexOrValue::Value(*closest_points[0]),
+                }
+                .into())
+            }
+        };
+        let p2_ref = match self.points.get_by_value(closest_points[1]) {
+            Some(p_ref) => *p_ref,
+            None => {
+                return Err(MeshError::PointNotFound {
+                    idx: IndexOrValue::Value(*closest_points[1]),
+                }
+                .into())
+            }
+        };
+        let new_pt_ref = self.points.insert(point).0;
+        let new_triangle = Triangle::new(p1_ref, p2_ref, new_pt_ref);
+        let new_t_ref = self.triangles.insert(new_triangle).0;
+
+        match self.point_relations.get_mut(&p1_ref) {
+            Some(tri_refs) => {
+                tri_refs.insert(new_t_ref);
+            }
+            None => {
+                return Err(MeshError::PointNotFound {
+                    idx: IndexOrValue::Index(IndexType::U32(p1_ref)),
+                }
+                .into())
+            }
+        };
+        match self.point_relations.get_mut(&p2_ref) {
+            Some(tri_refs) => {
+                tri_refs.insert(new_t_ref);
+            }
+            None => {
+                return Err(MeshError::PointNotFound {
+                    idx: IndexOrValue::Index(IndexType::U32(p2_ref)),
+                }
+                .into())
+            }
+        };
+        match self.point_relations.get_mut(&new_pt_ref) {
+            Some(tri_refs) => {
+                tri_refs.insert(new_t_ref);
+            }
+            None => {
+                return Err(MeshError::PointNotFound {
+                    idx: IndexOrValue::Index(IndexType::U32(new_pt_ref)),
+                }
+                .into())
+            }
+        };
+
+        let mut encroached_triangles = Vec::with_capacity(1);
+
+        if closest_points[2].point_in_circumcircle(&point, closest_points[0], closest_points[1]) {
+            match self.edge_triangles(&Edge::new(p1_ref, p2_ref)) {
+                Some(e) => {}
+                None => {
+                    return Err(MeshError::EdgeNotFound {
+                        edge: Edge::new(p1_ref, p2_ref),
+                    }
+                    .into())
+                }
+            }
+        }
+
+        Ok(())
     }
 
     pub fn insert_triangle_raw(&mut self, triangle: Triangle) -> NResult<TriangleRef> {
