@@ -369,7 +369,7 @@ impl NariMesh {
         }
 
         for edge in bad_edges {
-            self.remove_edge_raw(&edge);
+            self.remove_edge(&edge);
         }
 
         for edge in polygon {
@@ -452,7 +452,11 @@ impl NariMesh {
 
         if closest_points[2].point_in_circumcircle(&point, closest_points[0], closest_points[1]) {
             match self.edge_triangles(&Edge::new(p1_ref, p2_ref)) {
-                Some(e) => {}
+                Some(mut e) => {
+                    e.retain(|t| t != new_t_ref);
+                    let other = e[0];
+                    encroached_triangles.push(other);
+                }
                 None => {
                     return Err(MeshError::EdgeNotFound {
                         edge: Edge::new(p1_ref, p2_ref),
@@ -460,6 +464,10 @@ impl NariMesh {
                     .into())
                 }
             }
+        }
+
+        while !encroached_triangles.is_empty() {
+            let operating = encroached_triangles.pop();
         }
 
         Ok(())
@@ -501,7 +509,7 @@ impl NariMesh {
 
     pub fn remove_points(&mut self, point: impl IntoIterator<Item = Point2d>) -> NResult<()> {}
 
-    pub fn remove_triangle_raw(&mut self, t_ref: &TriangleRef) -> Option<Triangle> {
+    pub fn remove_triangle(&mut self, t_ref: &TriangleRef) -> Option<Triangle> {
         match self.triangles.get_by_index(t_ref) {
             Some(tri) => {
                 // remove relations
@@ -519,7 +527,7 @@ impl NariMesh {
         }
     }
 
-    pub fn remove_edge_raw(&mut self, edge: &Edge) -> Option<(StaticVec<TriangleRef, 2>, bool)> {
+    pub fn remove_edge(&mut self, edge: &Edge) -> Option<(StaticVec<TriangleRef, 2>, bool)> {
         match self.edges.get(edge) {
             Some(is_subsegment) => {
                 let is_subsegment = *is_subsegment;
@@ -527,7 +535,7 @@ impl NariMesh {
                 match self.edge_triangles(edge) {
                     Some(tris) => {
                         for tri in tris {
-                            self.remove_triangle_raw(&tri);
+                            self.remove_triangle(&tri);
                         }
                         Some((tris, is_subsegment))
                     }
@@ -625,6 +633,118 @@ impl NariMesh {
         }
 
         Ok(([start_np, end_np], new_point_idx))
+    }
+
+    pub fn flip_edge(&mut self, edge: &Edge) -> NResult<()> {
+        let triangles = match self.edge_triangles(edge) {
+            Some(t) => t,
+            None => return Err(MeshError::EdgeNotFound { edge: *edge }.into()),
+        };
+
+        let triangle_1 = match self.triangles.get_by_index(&triangles[0]) {
+            Some(tri) => tri,
+            None => {
+                return Err(MeshError::TriangleNotFound {
+                    idx: IndexOrValue::Index(triangles[0]),
+                }
+                .into())
+            }
+        };
+        let triangle_2 = match self.triangles.get_by_index(&triangles[1]) {
+            Some(tri) => tri,
+            None => {
+                return Err(MeshError::TriangleNotFound {
+                    idx: IndexOrValue::Index(triangles[1]),
+                }
+                .into())
+            }
+        };
+
+        let t1_ne_ref = triangle_1.non_edge_point(edge)? as PointRef;
+        let t2_ne_ref = triangle_2.non_edge_point(edge)? as PointRef;
+
+        // make sure they are real points
+        if !(self.points.get_by_index(&t1_ne_ref).is_some()
+            && self.points.get_by_index(&t2_ne_ref).is_some())
+        {
+            return Err(MeshError::NonEdgeImproperEdge {
+                triangle: *triangle_1,
+                edge: *edge,
+            }
+            .into());
+        }
+
+        let new_triangle_1 = Triangle::new(t1_ne_ref, t2_ne_ref, edge.start());
+        let new_triangle_2 = Triangle::new(t1_ne_ref, t2_ne_ref, edge.end());
+
+        // remove the edge & triangle
+        self.edges.remove(edge);
+        self.triangles.remove_by_index(&triangles[0]);
+        self.triangles.remove_by_index(&triangles[1]);
+
+        // link together new edge & triangle
+        self.edges.insert(Edge::new(t1_ne_ref, t2_ne_ref), false);
+        let nt_1_ref = self.triangles.insert(new_triangle_1).0;
+        let nt_2_ref = self.triangles.insert(new_triangle_2).0;
+
+        // recalculate neighbours
+        // remove old triangles from points & add new ones
+        match self.point_relations.get_mut(&t1_ne_ref) {
+            Some(relations) => {
+                relations.remove(&triangles[0]);
+                relations.remove(&triangles[1]);
+                relations.insert(nt_1_ref);
+                relations.insert(nt_2_ref);
+            }
+            None => {
+                return Err(MeshError::NoPointRelation {
+                    idx: IndexOrValue::Index(IndexType::U32(t1_ne_ref)),
+                }
+                .into())
+            }
+        }
+        match self.point_relations.get_mut(&t2_ne_ref) {
+            Some(relations) => {
+                relations.remove(&triangles[0]);
+                relations.remove(&triangles[1]);
+                relations.insert(nt_1_ref);
+                relations.insert(nt_2_ref);
+            }
+            None => {
+                return Err(MeshError::NoPointRelation {
+                    idx: IndexOrValue::Index(IndexType::U32(t2_ne_ref)),
+                }
+                .into())
+            }
+        }
+        match self.point_relations.get_mut(&edge.start()) {
+            Some(relations) => {
+                relations.remove(&triangles[0]);
+                relations.remove(&triangles[1]);
+                relations.insert(nt_1_ref);
+            }
+            None => {
+                return Err(MeshError::NoPointRelation {
+                    idx: IndexOrValue::Index(IndexType::U32(edge.start())),
+                }
+                .into())
+            }
+        }
+        match self.point_relations.get_mut(&edge.end()) {
+            Some(relations) => {
+                relations.remove(&triangles[0]);
+                relations.remove(&triangles[1]);
+                relations.insert(nt_2_ref);
+            }
+            None => {
+                return Err(MeshError::NoPointRelation {
+                    idx: IndexOrValue::Index(IndexType::U32(edge.end())),
+                }
+                .into())
+            }
+        }
+
+        Ok(())
     }
 
     // Terminator implementation of https://www.sciencedirect.com/science/article/pii/S0925772101000475?via%3Dihub

@@ -14,8 +14,12 @@ use thiserror::Error;
 pub enum MeshError {
     #[error("Failed to triangulate mesh: {why}")]
     Triangulation { why: String },
-    #[error("Point not found at ")]
+    #[error("Point not found at {idx}")]
     PointNotFound {
+        idx: IndexOrValue<IndexType, Point2d>,
+    },
+    #[error("Point Relation not found for point {idx}")]
+    NoPointRelation {
         idx: IndexOrValue<IndexType, Point2d>,
     },
     #[error("Edge not found at {idx}")]
