@@ -448,14 +448,12 @@ impl NariMesh {
             }
         };
 
-        let mut encroached_triangles = Vec::with_capacity(1);
-
         if closest_points[2].point_in_circumcircle(&point, closest_points[0], closest_points[1]) {
             match self.edge_triangles(&Edge::new(p1_ref, p2_ref)) {
                 Some(mut e) => {
                     e.retain(|t| t != new_t_ref);
                     let other = e[0];
-                    encroached_triangles.push(other);
+                    self.flip_edge(&Edge::new(p1_ref, p2_ref))?;
                 }
                 None => {
                     return Err(MeshError::EdgeNotFound {
@@ -464,10 +462,6 @@ impl NariMesh {
                     .into())
                 }
             }
-        }
-
-        while !encroached_triangles.is_empty() {
-            let operating = encroached_triangles.pop();
         }
 
         Ok(())
