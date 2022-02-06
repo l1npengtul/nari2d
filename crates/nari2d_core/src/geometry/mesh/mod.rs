@@ -228,6 +228,12 @@ pub fn triangle_circumcenter(p1: &Point2d, p2: &Point2d, p3: &Point2d) -> Point2
 }
 
 #[inline]
+pub fn triangle_circumradius(p1: &Point2d, p2: &Point2d, p3: &Point2d) -> f32 {
+    let circumcenter = triangle_circumcenter(p1, p2, p3);
+    circumcenter.distance_to(p1)
+}
+
+#[inline]
 pub fn triangle_centroid(p1: &Point2d, p2: &Point2d, p3: &Point2d) -> Point2d {
     Point2d::new(
         (p1.x() + p2.x() + p3.x()) / 3_f32,

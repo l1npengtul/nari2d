@@ -1,8 +1,5 @@
 use crate::{
-    error::{
-        util::{IndexOrValue, IndexType},
-        IndexOrValue,
-    },
+    error::util::{IndexOrValue, IndexType},
     geometry::{
         mesh::{Edge, Triangle, TriangleRef},
         Point2d,
@@ -28,10 +25,14 @@ pub enum MeshError {
     TriangleNotFound {
         idx: IndexOrValue<TriangleRef, Triangle>,
     },
-    #[error("Non Edge Operation on Triangle {triangle} with improper edge {edge}.")]
+    #[error("Non Edge Operation on Triangle {triangle} with improper edge {edge}")]
     NonEdgeImproperEdge { triangle: Triangle, edge: Edge },
     #[error("Could not calculate concave hull: {why}")]
     ConcaveError { why: String },
+    #[error("Too many points in mesh")]
+    TooManyPoints,
+    #[error("Less than 3 points in mesh")]
+    LessThanThreePoints,
 }
 
 pub type MResult<T> = Result<T, MeshError>;

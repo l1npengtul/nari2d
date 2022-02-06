@@ -4,6 +4,9 @@
 #![feature(map_first_last)]
 #![feature(total_cmp)]
 
+// chapter 8 - the core
+// painful/10, would play again
+
 #[cfg(feature = "serde_impl")]
 #[macro_use]
 extern crate serde;

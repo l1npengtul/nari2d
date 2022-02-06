@@ -1,6 +1,8 @@
-use crate::{error::NResult, geometry::Point2d};
-use smallvec::SmallVec;
-use std::ops::{Deref, DerefMut, Index};
+use crate::collections::point_store::PointStore;
+use crate::geometry::mesh::PointRef;
+use crate::geometry::Point2d;
+use simple_grid::Grid;
+use std::ops::{Deref, DerefMut};
 
 #[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
@@ -68,79 +70,24 @@ impl From<Point2d> for StrengthPoint {
 // Smallvec based flat storage of a lattice, column-row.
 // [ C1R1. C1R2, C1R3, ... C4R1, C4R2, ... ]
 // Start position is the first element
-#[derive(Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
+#[derive(Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct Lattice {
-    points: SmallVec<[StrengthPoint; 30]>,
-    width: u32,
-    height: u32,
+    points: PointStore<PointRef, StrengthPoint>,
+    grid: Grid<PointRef>,
 }
 
 impl Lattice {
-    pub fn new(
-        width: u32,
-        height: u32,
-        offset: Option<f32>,
-        default_strength: Option<f32>,
-    ) -> Self {
-        let offset = match offset {
-            Some(ofs) => ofs,
-            None => 20_f32,
-        };
+    pub fn new() -> Self {
+        let points = PointStore::from(vec![
+            StrengthPoint::new(Point2d::new(-20.0, 20.0), 1.0),
+            StrengthPoint::new(Point2d::new(20.0, 20.0), 1.0),
+            StrengthPoint::new(Point2d::new(20.0, -20.0), 1.0),
+            StrengthPoint::new(Point2d::new(-20.0, -20.0), 1.0),
+        ]);
 
-        let default_strength = match default_strength {
-            Some(def) => def,
-            None => 1_f32,
-        };
+        let grid = Grid::new(2, 2, points.indices().map(|x| *x).collect());
 
-        let mut points: SmallVec<[StrengthPoint; 30]> =
-            SmallVec::with_capacity((width * height) as usize);
-        for x in 0..width {
-            for y in 0..height {
-                points.push(StrengthPoint::new(
-                    Point2d::new((x as f32) * offset, (y as f32) * offset),
-                    default_strength,
-                ))
-            }
-        }
-
-        Lattice {
-            points,
-            width,
-            height,
-        }
+        Lattice { points, grid }
     }
-}
-
-impl Deref for Lattice {
-    type Target = SmallVec<[StrengthPoint; 30]>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.points
-    }
-}
-
-impl DerefMut for Lattice {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.points
-    }
-}
-
-pub struct LatticeRowView<'a> {
-    data: &'a [StrengthPoint],
-    index: u32,
-}
-
-pub struct LatticeRowViewMut<'a> {
-    data: &'a mut [StrengthPoint],
-    index: u32,
-}
-
-pub struct LatticeColumnView<'a> {
-    data: &'a [StrengthPoint],
-    index: u32,
-}
-
-pub struct LatticeColumnViewMut<'a> {
-    data: &'a mut [StrengthPoint],
-    index: u32,
 }

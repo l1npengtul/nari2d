@@ -1,4 +1,3 @@
-use crate::error::Nari2DError;
 use crate::{
     collections::{
         indexbimap::{IndexBiMap, Values},
@@ -23,7 +22,6 @@ use ahash::RandomState;
 use itertools::Itertools;
 use staticvec::{staticvec, StaticVec};
 use std::collections::{hash_map::Keys, BTreeSet, HashMap, HashSet};
-use std::f32::consts::E;
 
 // This is a similar mesh implementation to Triangle's Triangle based tri-mesh.
 #[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
@@ -293,16 +291,18 @@ impl NariMesh {
     // All these use a modified version of Bowyer Watson. https://en.wikipedia.org/wiki/Bowyer%E2%80%93Watson_algorithm
     // wattson in boiler in de_inferno what will she do
     pub fn insert_point(&mut self, point: Point2d) -> NResult<()> {
+        if (self.points_len() + 1) >= (u32::MAX as usize) {
+            return Err(MeshError::TooManyPoints.into());
+        }
         // check if outside or inside hull
         let hull = self.hull_points();
         if point.point_in_polygon(&hull) {
             self.ipt_boiler_wattson(point)?;
         } else {
+            self.ipt_outside(point)?;
         }
         Ok(())
     }
-
-    pub fn insert_points(&mut self, point: impl IntoIterator<Item = Point2d>) -> NResult<()> {}
 
     // ONLY VALID IF INSIDE POLYGON!
     fn ipt_boiler_wattson(&mut self, point: Point2d) -> NResult<()> {
@@ -450,9 +450,7 @@ impl NariMesh {
 
         if closest_points[2].point_in_circumcircle(&point, closest_points[0], closest_points[1]) {
             match self.edge_triangles(&Edge::new(p1_ref, p2_ref)) {
-                Some(mut e) => {
-                    e.retain(|t| t != new_t_ref);
-                    let other = e[0];
+                Some(_) => {
                     self.flip_edge(&Edge::new(p1_ref, p2_ref))?;
                 }
                 None => {
@@ -499,9 +497,75 @@ impl NariMesh {
         Ok(triangle_ref)
     }
 
-    pub fn remove_point(&mut self, point: Point2d) -> NResult<Point2d> {}
+    pub fn remove_point(&mut self, point: &Point2d) -> NResult<()> {
+        if self.points_len() <= 3 {
+            return Err(MeshError::LessThanThreePoints.into());
+        }
 
-    pub fn remove_points(&mut self, point: impl IntoIterator<Item = Point2d>) -> NResult<()> {}
+        let point_ref = match self.points.get_by_value(&point) {
+            Some(r) => *r,
+            None => {
+                return Err(MeshError::PointNotFound {
+                    idx: IndexOrValue::Value(*point),
+                }
+                .into())
+            }
+        };
+
+        let surrounding_points = match self.point_relations.get(&point_ref) {
+            Some(pts) => pts
+                .into_iter()
+                .filter_map(|t_ref| self.triangles.get_by_index(&t_ref).map(|t| t.points()))
+                .flatten()
+                .filter_map(|pt_ref| {
+                    if pt_ref != point_ref {
+                        return self.points.get_by_index(&pt_ref);
+                    }
+                    None
+                })
+                .map(|x| *x)
+                .collect::<Vec<Point2d>>(),
+            None => {
+                return Err(MeshError::NoPointRelation {
+                    idx: IndexOrValue::Value(*point),
+                }
+                .into())
+            }
+        };
+
+        let triangles = match cdt::triangulate_with_edges(
+            &surrounding_points
+                .iter()
+                .map(|pt| (pt.x() as f64, pt.y() as f64))
+                .collect::<Vec<(f64, f64)>>(),
+            surrounding_points.iter(),
+        ) {
+            Ok(t) => {
+                t.into_iter()
+                    // turn these back into points
+                    .map(|tri| {
+                        Triangle::new(
+                            surrounding_points[t.0] as PointRef,
+                            surrounding_points[t.1] as PointRef,
+                            surrounding_points[t.2] as PointRef,
+                        )
+                    })
+                    .collect::<Vec<Triangle>>()
+            }
+            Err(why) => {
+                return Err(MeshError::Triangulation {
+                    why: why.to_string(),
+                }
+                .into())
+            }
+        };
+
+        for triangle in triangles {
+            self.insert_triangle_raw(triangle)?;
+        }
+
+        Ok(())
+    }
 
     pub fn remove_triangle(&mut self, t_ref: &TriangleRef) -> Option<Triangle> {
         match self.triangles.get_by_index(t_ref) {

@@ -6,5 +6,4 @@ members = [
     "nari2d_file",
     "nari2d_physics",
     "nari2d_core",
-    "nari2d_traits"
 ]

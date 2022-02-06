@@ -1,9 +1,9 @@
-use crate::error::mesh::{MResult, MeshError};
-use crate::error::util::{IndexOrValue, IndexType};
-use nari2d_traits::index::NumIndex;
+use crate::error::{
+    mesh::{MResult, MeshError},
+    util::{IndexOrValue, IndexType},
+};
 use staticvec::{staticvec, StaticVec};
-use std::cmp::Ordering;
-use std::collections::BTreeSet;
+use std::{cmp::Ordering, collections::BTreeSet};
 
 pub type PointRef = u32;
 
@@ -185,3 +185,30 @@ impl Edge {
 pub type EdgeRef = u32;
 
 pub type TriangleRef = u32;
+
+#[cfg(test)]
+mod tests {
+    use crate::geometry::mesh::{Edge, Triangle};
+    use image::imageops::Triangle;
+
+    #[test]
+    fn triangle_test_new() {
+        let t = Triangle::new(3, 2, 1);
+        assert_eq!(t, Triangle::new(1, 2, 3))
+    }
+
+    #[test]
+    fn triangle_test_edges() {
+        let t = Triangle::new(3, 2, 1);
+        assert_eq!(
+            t.edges(),
+            [Edge::new(1, 2), Edge::new(2, 3), Edge::new(1, 3),]
+        )
+    }
+
+    #[test]
+    fn triangle_test_points() {
+        let t = Triangle::new(3, 2, 1);
+        assert_eq!(t.points(), [1, 2, 3])
+    }
+}

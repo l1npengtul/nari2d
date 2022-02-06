@@ -12,40 +12,32 @@ repository = "https://github.com/l1npengtul/nari2d"
 
 [features]
 default = ["serde_impl"]
-serde_impl = ["serde", "serde_derive", "nalgebra/serde-serialize", "staticvec/serde"]
+serde_impl = ["serde", "serde_derive", "staticvec/serde", "simple-grid/serde"]
 
 [dependencies]
 thiserror = "^1.0"
 bevy_ecs = "^0.6"
 petgraph = "^0.6"
-parking_lot = "^0.11"
+parking_lot = "^0.12"
 ahash = "^0.7"
 rstar = "^0.9"
-cdt = "0.1.0"
-nalgebra = "^0.30"
+cdt = "0.1.0" # cock and delaunay ~~torture~~ triangulation
 robust = "^0.2"
 bimap = "^0.6"
 staticvec = "^0.11"
 itertools = "^0.10"
-wide = "^0.7"
+simple-grid = "^2.1"
 
 [dependencies.image]
-version = "^0.23"
+version = "^0.24"
 default-features = false
 
 [dependencies.serde]
 version = "^1.0"
 default-features = false
-features = ["rc", "serde_derive"]
+features = ["serde_derive"]
 optional = true
 
 [dependencies.serde_derive]
 version = "^1.0"
 optional = true
-
-[dependencies.smallvec]
-version = "^1.7"
-features = ["serde", "union", "const_generics", "const_new"]
-
-[dependencies.nari2d_traits]
-path = "../nari2d_traits"
