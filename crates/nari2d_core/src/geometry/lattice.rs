@@ -1,6 +1,7 @@
-use crate::collections::point_store::PointStore;
-use crate::geometry::mesh::PointRef;
-use crate::geometry::Point2d;
+use crate::{
+    collections::point_store::PointStore,
+    geometry::{mesh::PointRef, Point2d},
+};
 use simple_grid::Grid;
 use std::ops::{Deref, DerefMut};
 
@@ -67,9 +68,6 @@ impl From<Point2d> for StrengthPoint {
     }
 }
 
-// Smallvec based flat storage of a lattice, column-row.
-// [ C1R1. C1R2, C1R3, ... C4R1, C4R2, ... ]
-// Start position is the first element
 #[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct Lattice {
@@ -90,4 +88,15 @@ impl Lattice {
 
         Lattice { points, grid }
     }
+
+    pub fn add_row(&mut self) {}
+    pub fn add_column(&mut self) {
+        // Attempt to mimic blender's lattice
+    }
+
+    pub fn remove_row(&mut self) -> Vec<Point2d> {}
+    pub fn remove_column(&mut self) -> Vec<Point2d> {}
+
+    pub fn scale_width(&mut self, factor: f32) {}
+    pub fn scale_height(&mut self, factor: f32) {}
 }
