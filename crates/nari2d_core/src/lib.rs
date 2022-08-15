@@ -1,8 +1,6 @@
 #![deny(clippy::pedantic)]
 #![warn(clippy::all)]
-#![feature(portable_simd)]
-#![feature(map_first_last)]
-#![feature(total_cmp)]
+#![feature(iter_collect_into)]
 
 // chapter 8 - the core
 // painful/10, would play again
@@ -11,10 +9,11 @@
 #[macro_use]
 extern crate serde;
 
+#[macro_use]
+extern crate nari2d_macros;
+
 pub mod accel;
 pub mod asset;
-pub mod collections;
 pub mod error;
 pub mod geometry;
 mod macros;
-pub mod traits;

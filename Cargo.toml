@@ -11,12 +11,12 @@ members = ["crates/*"]
 [dependencies]
 thiserror = "1.0"
 dashmap = "5.3"
-bevy_ecs = "0.7"
+bevy_ecs = "0.8"
 smallvec = "1.9"
 petgraph = "0.6.0"
 parking_lot = "0.12"
 euclid = "0.22.6"
-ahash = "0.7.5"
+ahash = "0.8.0"
 
 [dependencies.image]
 version = "0.24"

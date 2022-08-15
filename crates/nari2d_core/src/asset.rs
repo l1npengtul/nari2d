@@ -1,8 +1,7 @@
 use image::{ImageBuffer, Rgba};
-use parking_lot::RwLock;
 use std::{
     fmt::{Display, Formatter},
-    sync::Arc,
+    sync::{Arc, RwLock},
 };
 
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
