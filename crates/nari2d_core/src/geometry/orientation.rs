@@ -17,3 +17,15 @@ impl Orientation {
         self == &Orientation::ClockWise
     }
 }
+
+impl From<f64> for Orientation {
+    fn from(v: f64) -> Self {
+        if v.is_sign_negative() {
+            Orientation::ClockWise
+        } else if v.is_sign_positive() {
+            Orientation::CounterClockWise
+        } else {
+            Orientation::Colinear
+        }
+    }
+}

@@ -25,6 +25,7 @@ cgmath = "0.18"
 smallvec = "1.9"
 miette = "5.3"
 nalgebra = "0.31"
+robust = "0.2"
 
 [dependencies.image]
 version = "^0.24"

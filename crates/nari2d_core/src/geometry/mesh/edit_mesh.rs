@@ -11,6 +11,7 @@ use itertools::Itertools;
 use nanorand::{Rng, WyRand};
 use rstar::{primitives::GeomWithData, DefaultParams, RTree};
 use slotmap::{SecondaryMap, SlotMap};
+use std::collections::VecDeque;
 
 // based off of https://www.gradientspace.com/tutorials/dmesh3
 #[derive(Clone, Debug, Default)]
@@ -163,7 +164,7 @@ impl EditMesh {
         Ok(())
     }
 
-    // https://github.com/mourner/delaunator-rs/blob/master/src/lib.rs
+    // http://paper.academicpub.org/Paper?id=15630
     pub fn retriangulate_mesh(&mut self) -> NCResult<()> {
         const POINT_SHIFT_CONST: f32 = 0.000_001_f32;
 
@@ -171,61 +172,45 @@ impl EditMesh {
             return Err(Nari2DCoreError::TooFewPoints(self.points.len() as u8));
         }
 
-        let mut shift_amts = None;
+        let mut rand = WyRand::new();
+        let mut shifted_amts = SecondaryMap::with_capacity(self.points.len());
 
-        // find seed
-        let seed_triangle: Triangle = match self.seed_triangle() {
-            Some(st) => st.into(),
-            None => {
-                // colinear case
-                let mut rand = WyRand::new();
-                let mut samt = SecondaryMap::with_capacity(self.points.len());
+        self.points.iter_mut().for_each(|(id, pt)| {
+            let random_deviation = (rand.generate_range(-9..9) as f32) * POINT_SHIFT_CONST; // garuntee no points are colinear
+            pt.x += random_deviation;
+            shifted_amts.insert(id, random_deviation);
+        });
 
-                self.points.iter_mut().for_each(|(id, pt)| {
-                    let random_deviation = (rand.generate_range(-9..9) as f32) * POINT_SHIFT_CONST; // garuntee no points are colinear
-                    pt.y += random_deviation;
-                    samt.insert(id, random_deviation);
-                });
+        let mut convex_hull = Vec::with_capacity(3);
 
-                shift_amts = Some(samt);
-                self.seed_triangle()
-                    .ok_or(Nari2DCoreError::Triangulation(
-                        "Failed to get seed triangle!".into(),
-                    ))?
-                    .into()
-            }
-        };
+        // clear edges and relations
+        self.edges.clear();
+        self.triangles.clear();
+        self.point_edges.clear();
+        self.boarder_edges.clear();
+        self.triangle_edges.clear();
 
-        let npts = self.points.len();
-        let stri_p1 = self
-            .points
-            .get(seed_triangle.point0)
-            .ok_or(Nari2DCoreError::ThisIsABug("This should exist!".into()))?;
-        let stri_p2 = self
-            .points
-            .get(seed_triangle.point1)
-            .ok_or(Nari2DCoreError::ThisIsABug("This should exist!".into()))?;
-        let stri_p3 = self
-            .points
-            .get(seed_triangle.point2)
-            .ok_or(Nari2DCoreError::ThisIsABug("This should exist!".into()))?;
-        let center = Point2d::circumcenter(stri_p1, stri_p2, stri_p3);
-
-        let pts_by_dist = self
+        // seed triangle
+        let mut pts = self
             .points
             .iter()
-            .map(|(id, pt)| {
-                let dist = center.distance2(pt);
-                (dist, (id, pt))
-            })
-            .sorted_by(|(a, _), (b, _)| f32::total_cmp(a, b));
-
-        for (idx, (dist2, (id, point))) in pts_by_dist.enumerate() {
-            if seed_triangle.contains(id) {
-                continue;
-            }
+            .sorted()
+            .collect::<VecDeque<(PointId, &Point2d)>>();
+        let seed_tri_p0 = pts
+            .pop_front()
+            .ok_or(Nari2DCoreError::ThisIsABug("This should exist!".into()))?;
+        let seed_tri_p1 = pts
+            .pop_front()
+            .ok_or(Nari2DCoreError::ThisIsABug("This should exist!".into()))?;
+        let seed_tri_p2 = pts
+            .pop_front()
+            .ok_or(Nari2DCoreError::ThisIsABug("This should exist!".into()))?;
+        if Point2d::orientation(seed_tri_p0.1, seed_tri_p2.1, seed_tri_p1.1).is_counter_clock_wise()
+        {
+            //
+        } else {
+            //
         }
-        Ok(())
     }
 
     // https://github.com/mourner/delaunator-rs/blob/master/src/lib.rs

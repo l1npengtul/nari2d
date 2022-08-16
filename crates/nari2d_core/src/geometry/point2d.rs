@@ -1,5 +1,6 @@
 use crate::geometry::orientation::Orientation;
 use cgmath::{MetricSpace, Point2};
+use robust::{orient2d, Coord};
 use std::{
     cmp::Ordering,
     fmt::{Display, Formatter},
@@ -85,14 +86,7 @@ impl Point2d {
     }
 
     pub fn orientation(a: &Point2d, b: &Point2d, c: &Point2d) -> Orientation {
-        let val = ((b.y - a.y) * (c.x - b.x) - (b.x - a.x) * (c.y - b.y)) as i32;
-        if val == 0 {
-            Orientation::Colinear
-        } else if val > 0 {
-            Orientation::CounterClockWise
-        } else {
-            Orientation::ClockWise
-        }
+        orient2d(a.into(), b.into(), c.into()).into()
     }
 
     pub fn is_on_segment(&self, segment: (&Point2d, &Point2d)) -> bool {
@@ -224,6 +218,24 @@ impl From<Point2<f32>> for Point2d {
 impl From<Point2d> for Point2<f32> {
     fn from(p2: Point2d) -> Self {
         p2.int
+    }
+}
+
+impl From<Point2d> for Coord<f32> {
+    fn from(p2d: Point2d) -> Self {
+        Coord {
+            x: p2d.x(),
+            y: p2d.y(),
+        }
+    }
+}
+
+impl From<&Point2d> for Coord<f32> {
+    fn from(p2d: &Point2d) -> Self {
+        Coord {
+            x: p2d.x(),
+            y: p2d.y(),
+        }
     }
 }
 
