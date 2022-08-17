@@ -1,5 +1,6 @@
 use crate::geometry::orientation::Orientation;
 use cgmath::{MetricSpace, Point2};
+use float_eq::float_eq;
 use robust::{orient2d, Coord};
 use std::{
     cmp::Ordering,
@@ -181,7 +182,8 @@ impl Default for Point2d {
 
 impl PartialEq for Point2d {
     fn eq(&self, other: &Self) -> bool {
-        self.x == other.x && self.y == other.y
+        float_eq!(self.x(), other.x(), r2nd <= 2.0 * f32::EPSILON)
+            && float_eq!(self.y(), other.y(), r2nd <= 2.0 * f32::EPSILON)
     }
 }
 

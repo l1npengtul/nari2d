@@ -7,7 +7,6 @@ use crate::{
         point2d::Point2d,
     },
 };
-use cgmath::MetricSpace;
 use itertools::Itertools;
 use nanorand::{Rng, WyRand};
 use rstar::{primitives::GeomWithData, DefaultParams, RTree};
@@ -75,6 +74,7 @@ impl EditMesh {
     }
 
     pub fn insert_point_with_connectivity(&mut self, point: Point2d) -> Option<PointId> {
+        // first, check thing
         // first, we need to determine if the point lies outside or inside.
         match self.point_inside_polygon(&point) {
             true => {}
@@ -82,6 +82,7 @@ impl EditMesh {
         }
     }
 
+    #[allow(clippy::similar_names)]
     fn insert_point_outside(&mut self, point: Point2d) -> Option<PointId> {
         // get nearest 2 points
         let nearest_2 = self.closest_n(&point, 2)?;
@@ -131,7 +132,86 @@ impl EditMesh {
                 edges: [edge_npt_a_id, edge_npt_b_id, a_b_edge],
             },
         );
-        // self.point_edges
+        self.add_pointedge_or_init(pt_a, edge_npt_a_id);
+        self.add_pointedge_or_init(pt_b, edge_npt_b_id);
+        self.add_pointedge_or_init(new_pt, edge_npt_a_id);
+        self.add_pointedge_or_init(new_pt, edge_npt_b_id);
+        self.add_pointedge_or_init(pt_a, a_b_edge); // just making sure
+        self.add_pointedge_or_init(pt_b, a_b_edge); // just making sure
+                                                    // update our hull ==> remove a_b_edge, in its place put our 2 new edges
+        self.boarder_edges.retain(|e| e != &a_b_edge);
+        self.boarder_edges.push(edge_npt_a_id);
+        self.boarder_edges.push(edge_npt_b_id);
+        Some(new_pt)
+    }
+
+    #[allow(clippy::similar_names)]
+    fn insert_point_inside(&mut self, point: Point2d) -> Option<PointId> {
+        // find the nearest 2 points, and find the triangle that encloses this point.
+        let nearest_2 = self.closest_n(&point, 2)?;
+        let pt_a = *nearest_2.get(0)?;
+        let pt_b = *nearest_2.get(1)?;
+        let a_b_edge = *self.edge_from_points(pt_a, pt_b)?;
+        let new_pt = self.insert_point(point);
+        // find the triangle
+        let real_edge_of_ab = self.edges.get(a_b_edge)?;
+        let canidate_a = real_edge_of_ab.triangle0;
+        let canidate_b = real_edge_of_ab.triangle1;
+        // todo: let chains?
+        let encasing_triangle_id = match (canidate_a, canidate_b) {
+            // I LOVE RUST MATCHES I LOVE RUST MATCHES I LOVE THE ANTICHRIST AAAAAAAAAAAAAAAA
+            (Some(c_a), Some(c_b)) => {
+                let triangle_a = self.triangle(c_a)?;
+                let t_a_p0 = *self.points.get(triangle_a.point0)?;
+                let t_a_p1 = *self.points.get(triangle_a.point1)?;
+                let t_a_p2 = *self.points.get(triangle_a.point2)?;
+                let triangle_b = self.triangle(c_a)?;
+                let t_b_p0 = *self.points.get(triangle_b.point0)?;
+                let t_b_p1 = *self.points.get(triangle_b.point1)?;
+                let t_b_p2 = *self.points.get(triangle_b.point2)?;
+                if point.is_inside(&[t_a_p0, t_a_p1, t_a_p2]) {
+                    c_a
+                } else if point.is_inside(&[t_b_p0, t_b_p1, t_b_p2]) {
+                    c_b
+                } else {
+                    return None;
+                }
+            }
+            (_, Some(c_b)) => {
+                let triangle_b = self.triangle(c_b)?;
+                let t_b_p0 = *self.points.get(triangle_b.point0)?;
+                let t_b_p1 = *self.points.get(triangle_b.point1)?;
+                let t_b_p2 = *self.points.get(triangle_b.point2)?;
+                if point.is_inside(&[t_b_p0, t_b_p1, t_b_p2]) {
+                    c_b
+                } else {
+                    return None;
+                }
+            }
+            (Some(c_a), _) => {
+                let triangle_a = self.triangle(c_a)?;
+                let t_a_p0 = *self.points.get(triangle_a.point0)?;
+                let t_a_p1 = *self.points.get(triangle_a.point1)?;
+                let t_a_p2 = *self.points.get(triangle_a.point2)?;
+                if point.is_inside(&[t_a_p0, t_a_p1, t_a_p2]) {
+                    c_a
+                } else {
+                    return None;
+                }
+            }
+            (_, _) => return None,
+        };
+        let encasing_tri = self.triangles.get(encasing_triangle_id)?;
+        let ec_tri_p0 = encasing_tri.point0;
+        let ec_tri_p1 = encasing_tri.point1;
+        let ec_tri_p2 = encasing_tri.point2;
+        // now, we delete this triangle, and create 3 new triangles.
+        // this means we must delete the triangle, and triangle edges
+        // edges and point edges stay the same.
+        let old_edges = self.triangle_edges.remove(encasing_triangle_id)?;
+        self.triangles.remove(encasing_triangle_id);
+        // start insert triangles
+        let tri_p0_
     }
 
     pub fn insert_edge(&mut self, edge: Edge) -> EdgeId {
@@ -140,6 +220,24 @@ impl EditMesh {
 
     pub fn insert_triangle(&mut self, triangle: Triangle) -> TriangleId {
         self.triangles.insert(triangle)
+    }
+
+    pub fn add_pointedge_or_init(&mut self, point: PointId, data: EdgeId) {
+        match self.point_edges.get_mut(point) {
+            Some(pe) => {
+                if !pe.edges.contains(&data) {
+                    pe.edges.push(data)
+                }
+            }
+            None => {
+                self.point_edges.insert(
+                    point,
+                    PointEdge {
+                        edges: smallvec![data],
+                    },
+                );
+            }
+        }
     }
 
     // https://repositorium.sdum.uminho.pt/bitstream/1822/6429/1/ConcaveHull_ACM_MYS.pdf
@@ -441,5 +539,14 @@ impl EditMesh {
         };
 
         point.is_inside(&point_a_gon)
+    }
+
+    fn check_if_point_exists(&mut self, point: Point2d) -> bool {
+        for pt in self.points.values() {
+            if pt == &point {
+                return false;
+            }
+        }
+        return true;
     }
 }

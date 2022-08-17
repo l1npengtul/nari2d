@@ -1,5 +1,6 @@
 use crate::geometry::point2d::Point2d;
 use cgmath::{Angle as CGAngle, Rad};
+use float_eq::float_eq;
 use std::{
     cmp::Ordering,
     f32::consts::PI,
@@ -61,7 +62,7 @@ impl Default for Angle {
 
 impl PartialEq for Angle {
     fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
+        float_eq!(self.0, other.0, r2nd <= 2.0 * f32::EPSILON)
     }
 }
 
