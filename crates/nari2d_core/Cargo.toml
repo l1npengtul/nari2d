@@ -26,6 +26,7 @@ smallvec = "1.9"
 miette = "5.3"
 nalgebra = "0.31"
 robust = "0.2"
+array_tool = "1.0"
 
 [dependencies.image]
 version = "^0.24"

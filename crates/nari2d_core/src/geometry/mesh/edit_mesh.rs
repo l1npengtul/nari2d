@@ -7,10 +7,12 @@ use crate::{
         point2d::Point2d,
     },
 };
+use cgmath::MetricSpace;
 use itertools::Itertools;
 use nanorand::{Rng, WyRand};
 use rstar::{primitives::GeomWithData, DefaultParams, RTree};
 use slotmap::{SecondaryMap, SlotMap};
+use smallvec::smallvec;
 use std::collections::VecDeque;
 
 // based off of https://www.gradientspace.com/tutorials/dmesh3
@@ -21,7 +23,7 @@ pub struct EditMesh {
     edges: SlotMap<EdgeId, Edge>,
     point_edges: SecondaryMap<PointId, PointEdge>,
     triangle_edges: SecondaryMap<TriangleId, TriangleEdge>,
-    boarder_edges: Vec<PointId>,
+    boarder_edges: Vec<EdgeId>,
 }
 
 impl EditMesh {
@@ -40,15 +42,108 @@ impl EditMesh {
     pub fn edge(&self, id: EdgeId) -> Option<&Edge> {
         self.edges.get(id)
     }
+
     pub fn point_edge(&self, id: PointId) -> Option<&PointEdge> {
         self.point_edges.get(id)
     }
+
     pub fn triangle_edge(&self, id: TriangleId) -> Option<&TriangleEdge> {
         self.triangle_edges.get(id)
     }
 
+    pub fn edge_from_points(&self, a: PointId, b: PointId) -> Option<&EdgeId> {
+        let a_edges = self.point_edges.get(a)?;
+        let b_edges = self.point_edges.get(b)?;
+
+        for aege in a_edges.edges() {
+            for bege in b_edges.edges() {
+                if aege == bege {
+                    return Some(aege);
+                }
+            }
+        }
+
+        None
+    }
+
+    pub fn insert_point(&mut self, point: Point2d) -> PointId {
+        self.points.insert(point)
+    }
+
+    pub fn remove_point(&mut self, id: PointId) -> Option<Point2d> {
+        self.points.remove(id)
+    }
+
+    pub fn insert_point_with_connectivity(&mut self, point: Point2d) -> Option<PointId> {
+        // first, we need to determine if the point lies outside or inside.
+        match self.point_inside_polygon(&point) {
+            true => {}
+            false => {}
+        }
+    }
+
+    fn insert_point_outside(&mut self, point: Point2d) -> Option<PointId> {
+        // get nearest 2 points
+        let nearest_2 = self.closest_n(&point, 2)?;
+        let pt_a = *nearest_2.get(0)?;
+        let pt_b = *nearest_2.get(1)?;
+        let a_b_edge = *self.edge_from_points(pt_a, pt_b)?; // this is the edge we will delete from the hull
+        let new_pt = self.insert_point(point);
+        // find the ccw triangle for this
+        // make sure they are not colinear
+        let real_pt_a = self.points.get(pt_a)?;
+        let real_pt_b = self.points.get(pt_b)?;
+        let real_pt_c = self.points.get(new_pt)?;
+        let sorted_triangle: Triangle = match Point2d::orientation(real_pt_a, real_pt_b, real_pt_c)
+        {
+            Orientation::CounterClockWise => [pt_a, pt_b, new_pt].into(),
+            Orientation::ClockWise => [pt_a, new_pt, pt_b].into(),
+            Orientation::Colinear => {
+                self.remove_point(new_pt);
+                return None;
+            }
+        };
+
+        let triangleid = self.insert_triangle(sorted_triangle);
+        // insert the 2 new edges as well
+        let edge_new_a = Edge {
+            point0: pt_a,
+            point1: new_pt,
+            triangle0: Some(triangleid),
+            triangle1: None,
+        };
+        let edge_new_b = Edge {
+            point0: pt_b,
+            point1: new_pt,
+            triangle0: Some(triangleid),
+            triangle1: None,
+        };
+        let edge_npt_a_id = self.insert_edge(edge_new_a);
+        let edge_npt_b_id = self.insert_edge(edge_new_b);
+        // update the existing edge
+        self.edges
+            .get_mut(a_b_edge)?
+            .add_triangle_unoccupied(triangleid)?;
+        // update point edges and triangle edges
+        self.triangle_edges.insert(
+            triangleid,
+            TriangleEdge {
+                edges: [edge_npt_a_id, edge_npt_b_id, a_b_edge],
+            },
+        );
+        // self.point_edges
+    }
+
+    pub fn insert_edge(&mut self, edge: Edge) -> EdgeId {
+        self.edges.insert(edge)
+    }
+
+    pub fn insert_triangle(&mut self, triangle: Triangle) -> TriangleId {
+        self.triangles.insert(triangle)
+    }
+
     // https://repositorium.sdum.uminho.pt/bitstream/1822/6429/1/ConcaveHull_ACM_MYS.pdf
-    pub fn calculate_concave_hull(&self, nearest: i32) -> NCResult<Vec<PointId>> {
+    pub fn calculate_concave_hull(&self, nearest: i32) -> NCResult<Vec<EdgeId>> {
         let how_many_nearest = nearest as usize;
 
         if self.points.len() < how_many_nearest {
@@ -144,9 +239,7 @@ impl EditMesh {
             .iter()
             .map(|x| self.points.get(*x).map(|x| *x))
             .collect::<Option<Vec<Point2d>>>()
-            .ok_or(Nari2DCoreError::ThisIsABug(
-                "This should not error! Either you have concurrent access or this is a bug!".into(),
-            ))?;
+            .ok_or(Nari2DCoreError::ThisIsABug("This should not error!".into()))?;
 
         for point in tree.iter() {
             // check points
@@ -155,7 +248,23 @@ impl EditMesh {
             }
         }
 
-        Ok(hull)
+        let mut previous = *hull.last().ok_or(Nari2DCoreError::ThisIsABug(
+            "Hull should not be empty".into(),
+        ))?;
+        let mut hull_edges = vec![];
+
+        for pid in hull {
+            match self.edge_from_points(pid, previous) {
+                Some(eid) => hull_edges.push(*eid),
+                None => {
+                    return Err(Nari2DCoreError::DoesNotExist(
+                        "Edge for points does not exist, is the indexed mesh broken?".into(),
+                    ))
+                }
+            }
+        }
+
+        Ok(hull_edges)
     }
 
     pub fn recalculate_hull(&mut self, smoothness: i32) -> NCResult<()> {
@@ -237,6 +346,27 @@ impl EditMesh {
     }
 
     // https://github.com/mourner/delaunator-rs/blob/master/src/lib.rs
+    pub fn closest_n(&self, point: &Point2d, n: u32) -> Option<Vec<PointId>> {
+        if self.points.len() == 0 {
+            return None;
+        }
+        let distanced = self
+            .points
+            .iter()
+            .sorted_by(|(_, a), (_, b)| {
+                let dist_a = point.distance2(a);
+                let dist_b = point.distance2(b);
+
+                f32::total_cmp(&dist_a, &dist_b)
+            })
+            .map(|(id, _)| id)
+            .take(n as usize)
+            .collect_vec();
+
+        Some(distanced)
+    }
+
+    // https://github.com/mourner/delaunator-rs/blob/master/src/lib.rs
     pub fn bbox_center(&self) -> Point2d {
         let mut min_x = f32::INFINITY;
         let mut min_y = f32::INFINITY;
@@ -290,12 +420,26 @@ impl EditMesh {
     }
 
     fn visible_edge(&self, edges: &[EdgeId], point: &Point2d) -> Option<EdgeId> {
-        let mut polygon = edges
+        todo!()
+    }
+
+    fn point_inside_polygon(&self, point: &Point2d) -> bool {
+        // turn the edges into points
+        let point_a_gon = match self
+            .boarder_edges
             .iter()
-            .map(|x| self.edges.get(*x))
-            .flat_map(|x| x.map(|b| [b.point0, b.point1]))
-            .flatten()
-            .map(|x| self.points.get(x))
-            .collect::<Option<Vec<&Point2d>>>()?;
+            .map(|x| {
+                self.edges
+                    .get(*x)
+                    .map(|edge| self.points.get(edge.point0).map(|pt| *pt))
+                    .flatten()
+            })
+            .collect::<Option<Vec<Point2d>>>()
+        {
+            None => return false,
+            Some(v) => v,
+        };
+
+        point.is_inside(&point_a_gon)
     }
 }

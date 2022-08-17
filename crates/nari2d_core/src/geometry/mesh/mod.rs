@@ -53,9 +53,36 @@ pub struct Edge {
     pub triangle1: Option<TriangleId>,
 }
 
+impl Edge {
+    pub fn contains_point(&self, point: PointId) -> bool {
+        self.point0 == point || self.point1 == point
+    }
+
+    pub fn add_triangle_unoccupied(&mut self, new: TriangleId) -> Option<()> {
+        match self.triangle0 {
+            None => {
+                self.triangle0 = Some(new);
+            }
+            Some(_) => match self.triangle1 {
+                None => {
+                    self.triangle1 = Some(new);
+                }
+                Some(_) => return None,
+            },
+        };
+        Some(())
+    }
+}
+
 #[derive(Clone, Debug, Default, Ord, PartialOrd, Eq, PartialEq)]
 pub struct PointEdge {
     pub edges: SmallVec<[EdgeId; 6]>,
+}
+
+impl PointEdge {
+    pub fn edges(&self) -> &[EdgeId] {
+        &self.edges
+    }
 }
 
 impl From<SmallVec<[EdgeId; 6]>> for PointEdge {
@@ -74,20 +101,12 @@ impl From<[EdgeId; 6]> for PointEdge {
 
 #[derive(Clone, Debug, Default, Ord, PartialOrd, Eq, PartialEq)]
 pub struct TriangleEdge {
-    pub edges: SmallVec<[EdgeId; 3]>,
-}
-
-impl From<SmallVec<[EdgeId; 3]>> for TriangleEdge {
-    fn from(sv: SmallVec<[EdgeId; 3]>) -> Self {
-        Self { edges: sv }
-    }
+    pub edges: [EdgeId; 3],
 }
 
 impl From<[EdgeId; 3]> for TriangleEdge {
-    fn from(array: [EdgeId; 3]) -> Self {
-        Self {
-            edges: SmallVec::from(array),
-        }
+    fn from(sv: [EdgeId; 3]) -> Self {
+        Self { edges: sv }
     }
 }
 
