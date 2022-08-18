@@ -77,8 +77,8 @@ impl EditMesh {
         // first, check thing
         // first, we need to determine if the point lies outside or inside.
         match self.point_inside_polygon(&point) {
-            true => {}
-            false => {}
+            true => self.insert_point_inside(point),
+            false => self.insert_point_outside(point),
         }
     }
 
@@ -147,6 +147,12 @@ impl EditMesh {
 
     #[allow(clippy::similar_names)]
     fn insert_point_inside(&mut self, point: Point2d) -> Option<PointId> {
+        struct OldEdges {
+            p0p1: EdgeId,
+            p1p2: EdgeId,
+            p2p0: EdgeId,
+        }
+
         // find the nearest 2 points, and find the triangle that encloses this point.
         let nearest_2 = self.closest_n(&point, 2)?;
         let pt_a = *nearest_2.get(0)?;
@@ -203,15 +209,135 @@ impl EditMesh {
         };
         let encasing_tri = self.triangles.get(encasing_triangle_id)?;
         let ec_tri_p0 = encasing_tri.point0;
+        let valof_ec_t_p0 = self.points.get(ec_tri_p0)?;
         let ec_tri_p1 = encasing_tri.point1;
+        let valof_ec_t_p1 = self.points.get(ec_tri_p1)?;
         let ec_tri_p2 = encasing_tri.point2;
+        let valof_ec_t_p2 = self.points.get(ec_tri_p2)?;
+
         // now, we delete this triangle, and create 3 new triangles.
         // this means we must delete the triangle, and triangle edges
         // edges and point edges stay the same.
         let old_edges = self.triangle_edges.remove(encasing_triangle_id)?;
+        // figure out what the fuck these edges are
+
+        let (old_edge_p0p1, old_edge_p1p2, old_edge_p2p0) = {
+            let mut olds = OldEdges {
+                p0p1: Default::default(),
+                p1p2: Default::default(),
+                p2p0: Default::default(),
+            };
+
+            for edge in old_edges.edges {
+                let redge = self.edges.get(edge)?;
+                if redge.contains_point(ec_tri_p0) && redge.contains_point(ec_tri_p1) {
+                    olds.p0p1 = edge;
+                } else if redge.contains_point(ec_tri_p1) && redge.contains_point(ec_tri_p2) {
+                    olds.p1p2 = edge;
+                } else {
+                    olds.p2p0 = edge;
+                }
+            }
+            (olds.p0p1, olds.p1p2, olds.p2p0)
+        };
         self.triangles.remove(encasing_triangle_id);
         // start insert triangles
-        let tri_p0_
+        let tri_p0_p1 = match Point2d::orientation(valof_ec_t_p0, &point, valof_ec_t_p1) {
+            Orientation::CounterClockWise => Triangle {
+                point0: ec_tri_p0,
+                point1: new_pt,
+                point2: ec_tri_p1,
+            },
+            Orientation::ClockWise => Triangle {
+                point0: ec_tri_p0,
+                point1: ec_tri_p1,
+                point2: new_pt,
+            },
+            Orientation::Colinear => {
+                self.remove_point(new_pt);
+                return None;
+            }
+        };
+        let tri_p1_p2 = match Point2d::orientation(valof_ec_t_p1, &point, valof_ec_t_p2) {
+            Orientation::CounterClockWise => Triangle {
+                point0: ec_tri_p1,
+                point1: new_pt,
+                point2: ec_tri_p2,
+            },
+            Orientation::ClockWise => Triangle {
+                point0: ec_tri_p1,
+                point1: ec_tri_p2,
+                point2: new_pt,
+            },
+            Orientation::Colinear => {
+                self.remove_point(new_pt);
+                return None;
+            }
+        };
+        let tri_p2_p0 = match Point2d::orientation(valof_ec_t_p2, &point, valof_ec_t_p0) {
+            Orientation::CounterClockWise => Triangle {
+                point0: ec_tri_p2,
+                point1: new_pt,
+                point2: ec_tri_p0,
+            },
+            Orientation::ClockWise => Triangle {
+                point0: ec_tri_p2,
+                point1: ec_tri_p0,
+                point2: new_pt,
+            },
+            Orientation::Colinear => {
+                self.remove_point(new_pt);
+                return None;
+            }
+        };
+        let id_npt_p0_p1 = self.insert_triangle(tri_p0_p1);
+        let id_npt_p1_p2 = self.insert_triangle(tri_p1_p2);
+        let id_npt_p2_p0 = self.insert_triangle(tri_p2_p0);
+        // find out the edges for these triangles
+        // insert the new edges
+        let edge_npt_p0 = Edge {
+            point0: new_pt,
+            point1: ec_tri_p0,
+            triangle0: Some(id_npt_p0_p1),
+            triangle1: Some(id_npt_p2_p0),
+        };
+        let edge_npt_p1 = Edge {
+            point0: new_pt,
+            point1: ec_tri_p1,
+            triangle0: Some(id_npt_p1_p2),
+            triangle1: Some(id_npt_p0_p1),
+        };
+        let edge_npt_p2 = Edge {
+            point0: new_pt,
+            point1: ec_tri_p2,
+            triangle0: Some(id_npt_p2_p0),
+            triangle1: Some(id_npt_p1_p2),
+        };
+        let npt_p0_id = self.insert_edge(edge_npt_p0);
+        let npt_p1_id = self.insert_edge(edge_npt_p1);
+        let npt_p2_id = self.insert_edge(edge_npt_p2);
+
+        let edges_of_t_p0p1 = TriangleEdge {
+            edges: [old_edge_p0p1, npt_p0_id, npt_p1_id],
+        };
+        let edges_of_t_p1p2 = TriangleEdge {
+            edges: [old_edge_p1p2, npt_p1_id, npt_p2_id],
+        };
+        let edges_of_t_p2p0 = TriangleEdge {
+            edges: [old_edge_p2p0, npt_p2_id, npt_p0_id],
+        };
+        self.triangle_edges.insert(id_npt_p0_p1, edges_of_t_p0p1);
+        self.triangle_edges.insert(id_npt_p1_p2, edges_of_t_p1p2);
+        self.triangle_edges.insert(id_npt_p2_p0, edges_of_t_p2p0);
+        // update pointedges
+        self.add_pointedge_or_init(ec_tri_p0, npt_p0_id);
+        self.add_pointedge_or_init(ec_tri_p1, npt_p1_id);
+        self.add_pointedge_or_init(ec_tri_p2, npt_p2_id);
+        self.add_pointedge_or_init(new_pt, npt_p0_id);
+        self.add_pointedge_or_init(new_pt, npt_p1_id);
+        self.add_pointedge_or_init(new_pt, npt_p2_id);
+
+        Some(new_pt)
     }
 
     pub fn insert_edge(&mut self, edge: Edge) -> EdgeId {
@@ -412,12 +538,27 @@ impl EditMesh {
         let seed_tri_p2 = pts
             .pop_front()
             .ok_or(Nari2DCoreError::ThisIsABug("This should exist!".into()))?;
-        if Point2d::orientation(seed_tri_p0.1, seed_tri_p2.1, seed_tri_p1.1).is_counter_clock_wise()
+        let seed_triangle = if Point2d::orientation(seed_tri_p0.1, seed_tri_p2.1, seed_tri_p1.1)
+            .is_counter_clock_wise()
         {
-            //
+            Triangle {
+                point0: seed_tri_p0.0,
+                point1: seed_tri_p2.0,
+                point2: seed_tri_p1.0,
+            }
         } else {
-            //
-        }
+            Triangle {
+                point0: seed_tri_p0.0,
+                point1: seed_tri_p1.0,
+                point2: seed_tri_p2.0,
+            }
+        };
+        let mut seed_triangle_p0p1 = Edge {
+            point0: Default::default(),
+            point1: Default::default(),
+            triangle0: None,
+            triangle1: None,
+        };
     }
 
     // https://github.com/mourner/delaunator-rs/blob/master/src/lib.rs
